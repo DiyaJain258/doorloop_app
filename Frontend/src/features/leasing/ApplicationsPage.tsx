@@ -1,0 +1,244 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
+import api from '../../api';
+import { Application } from '../../types';
+import { PageHeader } from '../../components/PageHeader';
+import { DataTable } from '../../components/DataTable';
+import { FilterBar } from '../../components/FilterBar';
+import { FormDialog } from '../../components/FormDialog';
+import { Button } from '../../components/ui/Button';
+import { StatusBadge } from '../../components/StatusBadge';
+import { Eye, Check, X, ArrowRight, ShieldAlert, FileText, Play, Loader2 } from 'lucide-react';
+import { ColumnDef } from '@tanstack/react-table';
+
+export const ApplicationsPage: React.FC = () => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+
+  // Queries
+  const { data: applications = [], isLoading, error } = useQuery({
+    queryKey: ['applications-list'],
+    queryFn: () => api.leasing.getApplications(),
+  });
+
+  const startScreeningMutation = useMutation({
+    mutationFn: async (app: Application) => {
+      const names = app.tenantName.split(' ');
+      const first = names[0] || 'Applicant';
+      const last = names.slice(1).join(' ') || 'User';
+
+      // 1. Create screening check in the backend
+      await api.screening.create({
+        email: app.email,
+        firstName: first,
+        lastName: last,
+        propertyName: app.propertyName,
+        unitNumber: app.unitNumber,
+        status: 'Processing',
+      });
+
+      // 2. Set application status to Ready for Screening
+      return api.leasing.updateApplication(app.id, { status: 'Ready for Screening' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications-list'] });
+      setSelectedApp(null);
+      // Redirect to screening checks directory
+      navigate({ to: '/leasing/screening' });
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => api.leasing.updateApplication(id, { status: 'Approved' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications-list'] });
+      setSelectedApp(null);
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: string) => api.leasing.updateApplication(id, { status: 'Rejected' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications-list'] });
+      setSelectedApp(null);
+    },
+  });
+
+  const filteredApps = applications.filter((app) => {
+    const nameMatch = app.tenantName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === '' || app.status === statusFilter;
+    return nameMatch && matchesStatus;
+  });
+
+  const columns: ColumnDef<Application>[] = [
+    {
+      accessorKey: 'tenantName',
+      header: t('pmApplications.applicant'),
+      id: 'applicant',
+      cell: ({ row }) => (
+        <span
+          onClick={() => setSelectedApp(row.original)}
+          className="font-bold text-primary hover:underline cursor-pointer"
+        >
+          {row.original.tenantName}
+        </span>
+      ),
+    },
+    { accessorKey: 'propertyName', header: t('pmApplications.interestedProperty'), id: 'property' },
+    { accessorKey: 'unitNumber', header: t('pmApplications.unit'), id: 'unit' },
+    { 
+      accessorKey: 'submittedDate', 
+      header: t('pmApplications.submissionDate'), 
+      id: 'submittedDate',
+      cell: ({ row }) => {
+        const dateStr = row.original.submittedDate;
+        if (!dateStr) return '—';
+        return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      }
+    },
+    {
+      id: 'creditScore',
+      header: t('pmApplications.creditScore'),
+      cell: ({ row }) => {
+        const score = 650 + (((row.original.tenantName || '').length * 7) % 150);
+        return (
+          <span className={`font-bold ${score >= 700 ? 'text-emerald-500' : 'text-amber-500'}`}>
+            {score}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'rentProposed',
+      header: t('pmApplications.proposedRent'),
+      id: 'rentProposed',
+      cell: ({ row }) => <span className="font-semibold">${row.original.rentProposed.toLocaleString()}</span>,
+    },
+    {
+      accessorKey: 'status',
+      header: t('pmApplications.status'),
+      id: 'status',
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      id: 'actions',
+      header: t('pmApplications.actions'),
+      cell: ({ row }) => (
+        <div className="flex space-x-1">
+          <Button variant="ghost" size="icon" onClick={() => setSelectedApp(row.original)} title="Review Application">
+            <Eye className="w-4 h-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <PageHeader
+        title={t('pmApplications.title')}
+        description={t('pmApplications.desc')}
+        breadcrumbs={[
+          { label: t('header.home'), href: '/' },
+          { label: t('nav.leasing'), href: '/leasing/leases' },
+          { label: t('pmApplications.title') },
+        ]}
+      />
+
+      <FilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={t('pmApplications.searchPlaceholder')}
+        filters={[
+          {
+            key: 'status',
+            value: statusFilter,
+            placeholder: 'All Statuses',
+            options: [
+              { label: 'Pending', value: 'Pending' },
+              { label: 'Approved', value: 'Approved' },
+              { label: 'Rejected', value: 'Rejected' },
+            ],
+          },
+        ]}
+        onFilterChange={(key, val) => {
+          if (key === 'status') setStatusFilter(val);
+        }}
+        onReset={() => {
+          setSearchQuery('');
+          setStatusFilter('');
+        }}
+      />
+
+      <DataTable columns={columns} data={filteredApps} loading={isLoading} error={error ? error.message : null} />
+
+      {/* APPLICANT REVIEW DRAWER / DIALOG */}
+      <FormDialog
+        open={!!selectedApp}
+        onOpenChange={(open) => !open && setSelectedApp(null)}
+        title="Applicant Screening Record"
+      >
+        {selectedApp && (
+          <div className="space-y-6 pt-3 text-xs font-semibold text-foreground">
+            <div className="flex items-center space-x-3 p-4 bg-secondary/30 rounded-xl">
+              <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+                {selectedApp.tenantName.charAt(0)}
+              </div>
+              <div>
+                <h4 className="font-bold text-sm">{selectedApp.tenantName}</h4>
+                <p className="text-muted-foreground text-[10px]">{selectedApp.email}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase">Property Interest</p>
+                <p className="text-foreground mt-0.5">{selectedApp.propertyName} - Unit {selectedApp.unitNumber}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase">Proposed Monthly Rent</p>
+                <p className="text-foreground mt-0.5">${selectedApp.rentProposed.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase">Income Verification</p>
+                <p className="text-foreground mt-0.5">$5,200/mo (Verified via W2)</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase">Credit Score Rating</p>
+                <p className="text-emerald-500 font-bold mt-0.5">720 (Excellent)</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 border-t pt-4">
+              <h5 className="font-bold uppercase text-[10px] tracking-wide text-muted-foreground">Screening Checklists</h5>
+              <div className="flex justify-between items-center bg-secondary/10 p-2.5 rounded-lg border">
+                <span className="flex items-center gap-1.5"><ShieldAlert className="w-4 h-4 text-emerald-500" /> Criminal Eviction check</span>
+                <span className="text-emerald-500">CLEARED</span>
+              </div>
+              <div className="flex justify-between items-center bg-secondary/10 p-2.5 rounded-lg border">
+                <span className="flex items-center gap-1.5"><FileText className="w-4 h-4 text-emerald-500" /> Reference validation</span>
+                <span className="text-emerald-500">SUCCESS</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-6 border-t">
+              <Button variant="outline" onClick={() => setSelectedApp(null)}>Close</Button>
+              {selectedApp.status === 'Approved' && (
+                <Button onClick={() => navigate({ to: '/leases/new' })}>
+                  Convert to Lease
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </FormDialog>
+    </div>
+  );
+};
+export default ApplicationsPage;

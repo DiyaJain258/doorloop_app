@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IFrame Communicator</title>
+    <script type="text/javascript">
+        function callParentFunction(str) {
+            if (window.parent && window.parent.parent && window.parent.parent.AuthorizeNetIFrame) {
+                window.parent.parent.AuthorizeNetIFrame.onReceiveCommunication(str);
+            } else if (window.parent && window.parent.postMessage) {
+                window.parent.postMessage(str, "*");
+            }
+        }
+
+        function receiveMessage(e) {
+            if (e && e.data) {
+                callParentFunction(e.data);
+            }
+        }
+
+        if (window.addEventListener) {
+            window.addEventListener("message", receiveMessage, false);
+        } else if (window.attachEvent) {
+            window.attachEvent("onmessage", receiveMessage);
+        }
+
+        if (window.location.hash && window.location.hash.length > 1) {
+            callParentFunction(window.location.hash.substring(1));
+        }
+    </script>
+</head>
+<body>
+</body>
+</html>
