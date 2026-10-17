@@ -8,20 +8,19 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import apiClient from '../api/client';
 import { useAuthStore, useThemeStore } from '../store/useStore';
 import { Ionicons } from '@expo/vector-icons';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export const OwnerDashboard = ({ onNavigate }) => {
   const { user, logout, refreshAccessToken } = useAuthStore();
   const { theme, language } = useThemeStore();
   const isDarkMode = theme === 'dark';
   const es = language === 'es';
-  const styles = getStyles(isDarkMode);
+  const { width } = useWindowDimensions();
+  const styles = getStyles(isDarkMode, width);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -294,9 +293,19 @@ export const OwnerDashboard = ({ onNavigate }) => {
   );
 };
 
-const getStyles = (isDarkMode) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' },
-  scrollContent: { padding: 16, paddingBottom: 60 },
+const getStyles = (isDarkMode, width = 390) => {
+  const isTablet = width >= 768;
+  const isSmall = width <= 360;
+
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' },
+    scrollContent: {
+      padding: isSmall ? 10 : isTablet ? 24 : 16,
+      paddingBottom: 60,
+      width: '100%',
+      maxWidth: 1024,
+      alignSelf: 'center',
+    },
   center: { flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 8 },
 
@@ -387,4 +396,8 @@ const getStyles = (isDarkMode) => StyleSheet.create({
   propName: { color: isDarkMode ? '#f8fafc' : '#0f172a', fontSize: 15, fontWeight: '800' },
   propDetailLine: { flexDirection: 'row', alignItems: 'center' },
   propSub: { color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12.5 },
-});
+  });
+};
+
+export default OwnerDashboard;
+

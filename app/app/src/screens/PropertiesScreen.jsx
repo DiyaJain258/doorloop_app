@@ -2815,7 +2815,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   errorLabel: { color: '#ef4444', fontSize: 10.5, marginTop: 4, fontWeight: '700' },
   mainWrapper: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 60 },
+  scrollContent: { padding: 16, paddingBottom: 60, width: '100%', maxWidth: 1024, alignSelf: 'center' },
   center: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: colors.textSecondary, marginTop: 8 },
 
@@ -2823,6 +2823,9 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     backgroundColor: colors.background,
+    width: '100%',
+    maxWidth: 1024,
+    alignSelf: 'center',
   },
   headerTitle: {
     fontSize: 22,
@@ -2846,6 +2849,9 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+    width: '100%',
+    maxWidth: 1024,
+    alignSelf: 'center',
   },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   tabBtnActive: { backgroundColor: colors.background },
@@ -2915,7 +2921,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
 
   // Modals
   modalBg: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.85)', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.cardBorder, maxHeight: '85%' },
+  modalCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.cardBorder, maxHeight: '85%', width: '100%', maxWidth: 580, alignSelf: 'center' },
   modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
   modalSubHeader: { fontSize: 9, fontWeight: '850', color: '#38bdf8', letterSpacing: 0.8, marginTop: 10, marginBottom: 10 },

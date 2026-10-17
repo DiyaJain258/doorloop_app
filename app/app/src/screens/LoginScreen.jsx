@@ -93,10 +93,10 @@ export const LoginScreen = () => {
   const login = useAuthStore((state) => state.login);
 
   const handleLogin = async (selectedEmail, selectedPassword) => {
-    const targetEmail = selectedEmail || email;
-    const targetPassword = selectedPassword || password || '123456';
-    if (!targetEmail) {
-      setError('Please enter your email address');
+    const targetEmail = (selectedEmail || email || '').trim();
+    const targetPassword = selectedPassword || password;
+    if (!targetEmail || !targetPassword) {
+      setError('Please enter your email and password');
       return;
     }
     setError('');
@@ -143,12 +143,12 @@ export const LoginScreen = () => {
                 <Text style={styles.label} allowFontScaling={false}>Email Address</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="astoriamgmt21@gmail.com"
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
                   keyboardType="email-address"
-                  placeholderTextColor="#94a3b8"
+                  autoComplete="off"
+                  textContentType="none"
                 />
               </View>
 
@@ -156,11 +156,11 @@ export const LoginScreen = () => {
                 <Text style={styles.label} allowFontScaling={false}>Password</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="123456"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
-                  placeholderTextColor="#94a3b8"
+                  autoComplete="off"
+                  textContentType="none"
                 />
               </View>
 
@@ -176,42 +176,6 @@ export const LoginScreen = () => {
                   <Text style={styles.buttonText} allowFontScaling={false}>Log In</Text>
                 )}
               </TouchableOpacity>
-
-              {/* Quick Login Section */}
-              <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textAlign: 'center', marginBottom: 8, letterSpacing: 0.5 }}>
-                  QUICK DEMO LOGINS
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: 'rgba(56, 189, 248, 0.15)', borderWidth: 1, borderColor: 'rgba(56, 189, 248, 0.4)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}
-                    onPress={() => {
-                      setEmail('astoriamgmt21@gmail.com');
-                      setPassword('123456');
-                      handleLogin('astoriamgmt21@gmail.com', '123456');
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#38bdf8' }} allowFontScaling={false}>
-                      🏢 Manager
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: 'rgba(16, 185, 129, 0.15)', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.4)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}
-                    onPress={() => {
-                      setEmail('o@gmail.com');
-                      setPassword('123456');
-                      handleLogin('o@gmail.com', '123456');
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#10b981' }} allowFontScaling={false}>
-                      👤 Owner
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
 
               <TouchableOpacity
                 style={styles.signupLinkBtn}
@@ -757,8 +721,11 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: Platform.OS === 'ios' ? 40 : 20,
+    width: '100%',
+    maxWidth: 460,
+    alignSelf: 'center',
   },
   header: {
     alignItems: 'center',
@@ -805,6 +772,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     shadowOpacity: isDarkMode ? 0.35 : 0.1,
     shadowRadius: 8,
     elevation: 8,
+    width: '100%',
   },
   errorText: {
     color: '#f43f5e',
@@ -882,7 +850,8 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     fontWeight: '700',
   },
   signupLinkBtn: {
-    marginTop: 10,
+    marginTop: 16,
+    paddingVertical: 4,
     alignItems: 'center',
   },
   signupLinkText: {
@@ -931,8 +900,11 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   },
   modalScrollContentFlex: {
     flexGrow: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 18,
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
   },
   stepContainerFlex: {
     flex: 1,

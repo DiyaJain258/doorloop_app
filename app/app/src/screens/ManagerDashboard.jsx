@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
+  useWindowDimensions,
   Platform,
 } from 'react-native';
 import apiClient from '../api/client';
@@ -15,13 +16,12 @@ import { useAuthStore, useThemeStore } from '../store/useStore';
 import { useThemeColors } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width } = Dimensions.get('window');
-
 export const ManagerDashboard = ({ onNavigate }) => {
   const { user, logout, refreshAccessToken } = useAuthStore();
   const { language } = useThemeStore();
   const { colors, isDarkMode } = useThemeColors();
-  const styles = getStyles(colors, isDarkMode);
+  const { width } = useWindowDimensions();
+  const styles = getStyles(colors, isDarkMode, width);
 
   const [metrics, setMetrics] = useState({
     totalProperties: 0,
@@ -522,14 +522,25 @@ export const ManagerDashboard = ({ onNavigate }) => {
   );
 };
 
-const getStyles = (colors, isDarkMode) =>
-  StyleSheet.create({
+const getStyles = (colors, isDarkMode, width = 390) => {
+  const isTablet = width >= 768;
+  const isSmall = width <= 360;
+  const contentWidth = isTablet ? Math.min(width, 1024) : width;
+  const columns = isTablet ? 4 : 2;
+  const gap = isSmall ? 8 : 10;
+  const padding = isSmall ? 10 : 16;
+  const cardWidth = Math.floor((contentWidth - (padding * 2) - (gap * (columns - 1))) / columns);
+
+  return StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
     },
     scrollContent: {
-      padding: 16,
+      padding,
+      width: '100%',
+      maxWidth: 1024,
+      alignSelf: 'center',
     },
     center: {
       flex: 1,
@@ -577,14 +588,14 @@ const getStyles = (colors, isDarkMode) =>
     metricsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 10,
+      gap,
       marginBottom: 16,
     },
     metricCard: {
-      width: (width - 42) / 2,
+      width: cardWidth,
       backgroundColor: colors.surface,
       borderRadius: 14,
-      padding: 14,
+      padding: isSmall ? 10 : 14,
       borderWidth: 1,
       borderColor: colors.cardBorder,
     },
@@ -792,3 +803,7 @@ const getStyles = (colors, isDarkMode) =>
       color: colors.textPrimary,
     },
   });
+};
+
+export default ManagerDashboard;
+

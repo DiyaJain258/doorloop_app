@@ -34,6 +34,7 @@ import { TenantDocumentsScreen } from './screens/TenantDocumentsScreen';
 import { StatementsScreen } from './screens/StatementsScreen';
 import { DistributionsScreen } from './screens/DistributionsScreen';
 import { ReportsScreen } from './screens/ReportsScreen';
+import { OwnerReportsScreen } from './screens/OwnerReportsScreen';
 import { InvoicesScreen } from './screens/InvoicesScreen';
 import { TenantLedgerScreen } from './screens/TenantLedgerScreen';
 import { TenantServicesScreen } from './screens/TenantServicesScreen';
@@ -349,6 +350,9 @@ export default function App() {
       case 'statements':
         return <StatementsScreen />;
       case 'reports':
+        if (role === 'Owner') {
+          return <OwnerReportsScreen onNavigate={handleNavigate} />;
+        }
         return <ReportsScreen />;
       case 'rent':
       case 'payments':
@@ -595,6 +599,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingHorizontal: 2,
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
   },
   bottomTabItem: {
     flex: 1,

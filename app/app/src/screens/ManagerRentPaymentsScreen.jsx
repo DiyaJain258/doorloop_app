@@ -2176,7 +2176,7 @@ const getStyles = (colors, isDarkMode) =>
     errorLabel: { color: '#ef4444', fontSize: 10.5, marginTop: 4, fontWeight: '700' },
     mainWrapper: { flex: 1, backgroundColor: colors.background },
     container: { flex: 1 },
-    scrollContent: { paddingHorizontal: 16, paddingBottom: 60 },
+    scrollContent: { paddingHorizontal: 16, paddingBottom: 60, width: '100%', maxWidth: 1024, alignSelf: 'center' },
 
     fixedHeader: {
       backgroundColor: colors.background,
@@ -2185,6 +2185,9 @@ const getStyles = (colors, isDarkMode) =>
       borderBottomWidth: 1,
       borderBottomColor: colors.cardBorder,
       zIndex: 10,
+      width: '100%',
+      maxWidth: 1024,
+      alignSelf: 'center',
     },
     title: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
     subtitle: { fontSize: 11.5, color: colors.textSecondary, marginTop: 2, lineHeight: 15 },
@@ -2458,6 +2461,8 @@ const getStyles = (colors, isDarkMode) =>
       backgroundColor: colors.surface,
       borderRadius: 20,
       width: '100%',
+      maxWidth: 580,
+      alignSelf: 'center',
       maxHeight: '88%',
       padding: 18,
       borderWidth: 1,

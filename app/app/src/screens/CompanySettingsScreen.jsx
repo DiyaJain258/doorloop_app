@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../api/client';
@@ -63,13 +64,20 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
   const [maxLateFeeCap, setMaxLateFeeCap] = useState('150');
   const [autoApplyLateFees, setAutoApplyLateFees] = useState(true);
 
-  // Tab 4: Users & Roles States
+  // Tab 4: Users & Roles States (Synced with Web App Organization User Hub)
   const [usersList, setUsersList] = useState([]);
   const [userModalOpen, setUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPhone, setNewUserPhone] = useState('');
-  const [newUserRole, setNewUserRole] = useState('Property Manager');
+  const [newUserRole, setNewUserRole] = useState('Maintenance Staff');
+  const [newUserStatus, setNewUserStatus] = useState('Active');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserServiceType, setNewUserServiceType] = useState('Plumber');
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('All');
+  const [creatingUser, setCreatingUser] = useState(false);
 
   // Tab 5: Roles & Permissions States
   const [rolesList, setRolesList] = useState([
@@ -113,32 +121,160 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
     { id: 3, name: 'Bank Feeds API Connector', type: 'REST API Key', status: 'Active', lastSync: '1 hour ago' },
   ]);
 
-  // Fetch initial data
-  useEffect(() => {
-    const loadCompanyData = async () => {
-      try {
-        setLoading(true);
-        const [usersRes, rolesRes] = await Promise.all([
-          apiClient.get('/users', logout, refreshAccessToken).catch(() => null),
-          apiClient.get('/roles', logout, refreshAccessToken).catch(() => null),
-        ]);
-        if (usersRes?.data || Array.isArray(usersRes)) {
-          setUsersList(usersRes?.data || usersRes || []);
-        } else {
-          setUsersList([
-            { id: 1, name: 'Alex Johnson', email: 'alex@apexpm.com', role: 'Property Manager', status: 'Active' },
-            { id: 2, name: 'Maria Santos', email: 'maria@apexpm.com', role: 'Collection Manager', status: 'Active' },
-            { id: 3, name: 'David Lee', email: 'david@apexpm.com', role: 'Maintenance Staff', status: 'Active' },
-          ]);
-        }
-      } catch (e) {
-        console.log('Error loading company data:', e.message);
-      } finally {
-        setLoading(false);
+  // Fetch initial data - Uses /superadmin/company-users matching Web App UsersPage 1-to-1
+  const loadCompanyData = async () => {
+    try {
+      setLoading(true);
+      const [usersRes, rolesRes] = await Promise.all([
+        apiClient.get('/superadmin/company-users', logout, refreshAccessToken).catch((e) => {
+          console.log('Error fetching company users:', e?.message);
+          return null;
+        }),
+        apiClient.get('/roles', logout, refreshAccessToken).catch(() => null),
+      ]);
+      const rawList = usersRes?.data !== undefined ? usersRes.data : (Array.isArray(usersRes) ? usersRes : []);
+      if (Array.isArray(rawList)) {
+        setUsersList(
+          rawList.map((u) => ({
+            id: u.id,
+            name: u.name || '',
+            email: u.email || '',
+            phone: u.phone || '',
+            role: u.role || 'Maintenance Staff',
+            status: u.status || 'Active',
+            serviceType: u.serviceType || '',
+          }))
+        );
       }
-    };
+    } catch (e) {
+      console.log('Error loading company data:', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadCompanyData();
   }, []);
+
+  // Filter users matching Web App UsersPage.tsx logic (line 244)
+  const filteredUsers = usersList.filter((u) => {
+    if (u.role === 'Property Manager') {
+      return false;
+    }
+    const matchesRole = userRoleFilter === 'All' || (u.role && u.role.toLowerCase() === userRoleFilter.toLowerCase());
+    const query = userSearchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      (u.name || '').toLowerCase().includes(query) ||
+      (u.email || '').toLowerCase().includes(query);
+    return matchesRole && matchesSearch;
+  });
+
+  const handleToggleStatus = async (userItem) => {
+    const nextStatus = userItem.status === 'Active' ? 'Suspended' : 'Active';
+    try {
+      await apiClient.put(`/superadmin/company-users/${userItem.id}/status`, { status: nextStatus }, logout, refreshAccessToken);
+      setUsersList((prev) =>
+        prev.map((u) => (u.id === userItem.id ? { ...u, status: nextStatus } : u))
+      );
+      Alert.alert('Status Updated', `User status is now ${nextStatus}.`);
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to update user status.');
+    }
+  };
+
+  const handleDeleteUser = (userItem) => {
+    Alert.alert(
+      'Revoke User Access',
+      `Are you sure you want to delete ${userItem.name || userItem.email}? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.delete(`/superadmin/company-users/${userItem.id}`, logout, refreshAccessToken);
+              setUsersList((prev) => prev.filter((u) => u.id !== userItem.id));
+              Alert.alert('Deleted', 'User account revoked successfully.');
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Failed to delete user.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleOpenCreateUser = () => {
+    setEditingUser(null);
+    setNewUserName('');
+    setNewUserEmail('');
+    setNewUserPhone('');
+    setNewUserRole('Maintenance Staff');
+    setNewUserStatus('Active');
+    setNewUserServiceType('Plumber');
+    setNewUserPassword('');
+    setUserModalOpen(true);
+  };
+
+  const handleOpenEditUser = (u) => {
+    setEditingUser(u);
+    setNewUserName(u.name || '');
+    setNewUserEmail(u.email || '');
+    setNewUserPhone(u.phone || '');
+    setNewUserRole(u.role || 'Maintenance Staff');
+    setNewUserStatus(u.status || 'Active');
+    setNewUserServiceType(u.serviceType || 'Plumber');
+    setNewUserPassword('');
+    setUserModalOpen(true);
+  };
+
+  const handleSaveUserModal = async () => {
+    if (!newUserName.trim() || !newUserEmail.trim()) {
+      Alert.alert('Required', 'Please enter full name and email address.');
+      return;
+    }
+    if (!editingUser && !newUserPassword.trim()) {
+      Alert.alert('Required', 'Please enter a password for the new user.');
+      return;
+    }
+    try {
+      setCreatingUser(true);
+      if (editingUser) {
+        // Update user status
+        await apiClient.put(`/superadmin/company-users/${editingUser.id}/status`, {
+          status: newUserStatus,
+        }, logout, refreshAccessToken);
+        Alert.alert('Success', 'User profile updated successfully.');
+      } else {
+        const payload = {
+          name: newUserName.trim(),
+          email: newUserEmail.trim(),
+          phone: newUserPhone.trim(),
+          password: newUserPassword.trim() || 'Password123!',
+          role: newUserRole,
+          status: newUserStatus || 'Active',
+          team: newUserRole,
+          serviceType: (newUserRole === 'Maintenance Staff' || newUserRole === 'Maintenance') ? newUserServiceType : undefined,
+        };
+        await apiClient.post('/superadmin/company-users', payload, logout, refreshAccessToken);
+        Alert.alert('Success', `User ${newUserName} provisioned as ${newUserRole}!`);
+      }
+      setUserModalOpen(false);
+      setEditingUser(null);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPhone('');
+      setNewUserPassword('');
+      loadCompanyData();
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Operation failed.');
+    } finally {
+      setCreatingUser(false);
+    }
+  };
 
   const handleSaveSettings = () => {
     setSaving(true);
@@ -149,27 +285,6 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
         language === 'es' ? 'Los ajustes se actualizaron correctamente.' : language === 'hi' ? 'सेटिंग्स सफलतापूर्वक अपडेट हो गईं।' : 'Company settings updated successfully.'
       );
     }, 600);
-  };
-
-  const handleAddUser = () => {
-    if (!newUserName.trim() || !newUserEmail.trim()) {
-      Alert.alert('Required', 'Please enter user name and email.');
-      return;
-    }
-    const newUser = {
-      id: Date.now(),
-      name: newUserName.trim(),
-      email: newUserEmail.trim(),
-      phone: newUserPhone.trim(),
-      role: newUserRole,
-      status: 'Active',
-    };
-    setUsersList([newUser, ...usersList]);
-    setNewUserName('');
-    setNewUserEmail('');
-    setNewUserPhone('');
-    setUserModalOpen(false);
-    Alert.alert('Success', `User ${newUser.name} provisioned as ${newUserRole}.`);
   };
 
   const submenus = [
@@ -504,36 +619,145 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
         {activeTab === 'users' && (
           <View style={styles.sectionCard}>
             <View style={styles.cardHeaderRow}>
-              <View>
-                <Text style={styles.cardTitle}>Staff & Manager Accounts</Text>
-                <Text style={styles.cardDesc}>Manage internal team access and portal roles</Text>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={styles.cardTitle}>Active System Accounts</Text>
+                <Text style={styles.cardDesc}>
+                  Provision agency personnel, configure role relationships & manage statuses.
+                </Text>
               </View>
-              <TouchableOpacity
-                style={styles.actionBtnSmall}
-                onPress={() => setUserModalOpen(true)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="add" size={16} color="#0f172a" />
-                <Text style={styles.actionBtnSmallText}>+ User</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <TouchableOpacity
+                  style={styles.refreshIconBtn}
+                  onPress={loadCompanyData}
+                  disabled={loading}
+                >
+                  <Ionicons name="refresh" size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtnSmall}
+                  onPress={handleOpenCreateUser}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={16} color="#0f172a" />
+                  <Text style={styles.actionBtnSmallText}>+ User</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {usersList.map((u, i) => (
-              <View key={u.id || i} style={styles.userListItem}>
-                <View style={styles.userItemAvatar}>
-                  <Text style={styles.userItemAvatarText}>
-                    {(u.name?.charAt(0) || u.firstName?.charAt(0) || 'U').toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.userItemName}>{u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim()}</Text>
-                  <Text style={styles.userItemEmail}>{u.email}</Text>
-                </View>
-                <View style={styles.userRoleBadge}>
-                  <Text style={styles.userRoleBadgeText}>{u.role || 'Manager'}</Text>
-                </View>
+            {/* Search and Role Filter */}
+            <View style={styles.userFilterRow}>
+              <View style={styles.userSearchBox}>
+                <Ionicons name="search" size={14} color={colors.textMuted} style={{ marginRight: 6 }} />
+                <TextInput
+                  style={styles.userSearchInput}
+                  placeholder="Search name or email..."
+                  placeholderTextColor={colors.textMuted}
+                  value={userSearchQuery}
+                  onChangeText={setUserSearchQuery}
+                />
+                {userSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setUserSearchQuery('')}>
+                    <Ionicons name="close-circle" size={14} color={colors.textMuted} />
+                  </TouchableOpacity>
+                )}
               </View>
-            ))}
+            </View>
+
+            {/* Role Filter Pills */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {['All', 'Maintenance Staff', 'Collection Manager'].map((r) => {
+                const isSelected = userRoleFilter === r;
+                return (
+                  <TouchableOpacity
+                    key={r}
+                    style={[styles.roleFilterChip, isSelected && styles.roleFilterChipActive]}
+                    onPress={() => setUserRoleFilter(r)}
+                  >
+                    <Text style={[styles.roleFilterChipText, isSelected && styles.roleFilterChipTextActive]}>
+                      {r}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* User List */}
+            {loading ? (
+              <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#38bdf8" />
+                <Text style={{ marginTop: 8, fontSize: 12, color: colors.textSecondary }}>
+                  Loading organization users...
+                </Text>
+              </View>
+            ) : filteredUsers.length === 0 ? (
+              <View style={styles.emptyUsersBox}>
+                <Ionicons name="people-outline" size={32} color={colors.textMuted} />
+                <Text style={styles.emptyUsersTitle}>No users found</Text>
+                <Text style={styles.emptyUsersSub}>
+                  {userSearchQuery ? 'Try matching another name or email' : 'Provision a new team member to get started'}
+                </Text>
+              </View>
+            ) : (
+              filteredUsers.map((u, i) => {
+                const isActive = u.status === 'Active';
+                return (
+                  <View key={u.id || i} style={styles.userCardItem}>
+                    <View style={styles.userCardMainRow}>
+                      <View style={styles.userItemAvatar}>
+                        <Text style={styles.userItemAvatarText}>
+                          {(u.name?.charAt(0) || u.email?.charAt(0) || 'U').toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={styles.userItemName}>{u.name || 'Unnamed User'}</Text>
+                        <Text style={styles.userItemEmail}>{u.email}</Text>
+                        {u.phone ? <Text style={styles.userItemPhone}>{u.phone}</Text> : null}
+                      </View>
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <View style={styles.userRoleBadge}>
+                          <Text style={styles.userRoleBadgeText}>{(u.role || 'Staff').toUpperCase()}</Text>
+                        </View>
+                        <View style={[styles.userStatusBadge, isActive ? styles.statusActiveBadge : styles.statusSuspendedBadge]}>
+                          <View style={[styles.statusDot, isActive ? styles.statusDotActive : styles.statusDotSuspended]} />
+                          <Text style={[styles.userStatusText, isActive ? styles.statusTextActive : styles.statusTextSuspended]}>
+                            {(u.status || 'Active').toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Actions Row */}
+                    <View style={styles.userActionsRow}>
+                      <TouchableOpacity
+                        style={styles.editUserBtn}
+                        onPress={() => handleOpenEditUser(u)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="create-outline" size={15} color="#38bdf8" />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.statusToggleBtn, isActive ? styles.suspendBtn : styles.activateBtn]}
+                        onPress={() => handleToggleStatus(u)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.statusToggleText, isActive ? styles.suspendText : styles.activateText]}>
+                          {isActive ? 'Suspend' : 'Activate'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.deleteUserBtn}
+                        onPress={() => handleDeleteUser(u)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="trash-outline" size={15} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })
+            )}
           </View>
         )}
 
@@ -709,53 +933,161 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Add User Modal */}
+      {/* Add / Edit User Modal */}
       <Modal visible={userModalOpen} transparent={true} animationType="slide" onRequestClose={() => setUserModalOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalBox}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Provision New User</Text>
+              <View>
+                <Text style={styles.modalTitle}>
+                  {editingUser ? 'Modify User Profile' : 'Provision User Account'}
+                </Text>
+                <Text style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                  Define metadata profiles and organization scope access
+                </Text>
+              </View>
               <TouchableOpacity onPress={() => setUserModalOpen(false)}>
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Full Name</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newUserName}
-                onChangeText={setNewUserName}
-                placeholder="E.g., John Miller"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Full Name *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newUserName}
+                  onChangeText={setNewUserName}
+                  placeholder="E.g., David Miller"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email Address</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newUserEmail}
-                onChangeText={setNewUserEmail}
-                keyboardType="email-address"
-                placeholder="john@whatslandlord.com"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email Address *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newUserEmail}
+                  onChangeText={setNewUserEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  placeholder="david@company.com"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Assigned Role</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newUserRole}
-                onChangeText={setNewUserRole}
-                placeholder="Property Manager"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newUserPhone}
+                  onChangeText={setNewUserPhone}
+                  keyboardType="phone-pad"
+                  placeholder="e.g. (555) 0122"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
 
-            <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleAddUser} activeOpacity={0.8}>
-              <Text style={styles.modalSubmitBtnText}>Create Account</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Status</Text>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                  {['Active', 'Suspended'].map((st) => {
+                    const isSelected = newUserStatus === st;
+                    return (
+                      <TouchableOpacity
+                        key={st}
+                        style={[styles.roleSelectChip, isSelected && styles.roleSelectChipActive]}
+                        onPress={() => setNewUserStatus(st)}
+                      >
+                        <Text style={[styles.roleSelectChipText, isSelected && styles.roleSelectChipTextActive]}>
+                          {st}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Role</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                  {['Maintenance Staff', 'Collection Manager'].map((role) => {
+                    const isSelected = newUserRole === role;
+                    return (
+                      <TouchableOpacity
+                        key={role}
+                        style={[styles.roleSelectChip, isSelected && styles.roleSelectChipActive]}
+                        onPress={() => setNewUserRole(role)}
+                      >
+                        <Text style={[styles.roleSelectChipText, isSelected && styles.roleSelectChipTextActive]}>
+                          {role}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {(newUserRole === 'Maintenance Staff' || newUserRole === 'Maintenance') && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Specialty Trade</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                    {[
+                      'Plumber',
+                      'Electrician',
+                      'HVAC',
+                      'General Contractor',
+                      'Cleaning',
+                      'Landscaping',
+                      'Pest Control',
+                      'Security',
+                      'Roofing',
+                    ].map((type) => {
+                      const isSelected = newUserServiceType === type;
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          style={[styles.roleSelectChip, isSelected && styles.roleSelectChipActive]}
+                          onPress={() => setNewUserServiceType(type)}
+                        >
+                          <Text style={[styles.roleSelectChipText, isSelected && styles.roleSelectChipTextActive]}>
+                            {type}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>
+                  {editingUser ? 'User Password (leave blank to keep)' : 'User Password *'}
+                </Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newUserPassword}
+                  onChangeText={setNewUserPassword}
+                  secureTextEntry
+                  placeholder={editingUser ? 'Leave blank to keep current' : 'Choose secure password'}
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.modalSubmitBtn}
+              onPress={handleSaveUserModal}
+              disabled={creatingUser}
+              activeOpacity={0.8}
+            >
+              {creatingUser ? (
+                <ActivityIndicator size="small" color="#0f172a" />
+              ) : (
+                <Text style={styles.modalSubmitBtnText}>
+                  {editingUser ? 'Update Profile' : 'Provision Account'}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -778,6 +1110,9 @@ const getStyles = (colors, isDarkMode) =>
       paddingVertical: 14,
       borderBottomWidth: 1,
       borderBottomColor: colors.cardBorder,
+      width: '100%',
+      maxWidth: 1024,
+      alignSelf: 'center',
     },
     headerTitle: {
       fontSize: 18,
@@ -806,6 +1141,9 @@ const getStyles = (colors, isDarkMode) =>
       borderBottomWidth: 1,
       borderBottomColor: colors.cardBorder,
       backgroundColor: colors.surface,
+      width: '100%',
+      maxWidth: 1024,
+      alignSelf: 'center',
     },
     subtabsContent: {
       paddingHorizontal: 12,
@@ -840,6 +1178,9 @@ const getStyles = (colors, isDarkMode) =>
     },
     contentContainer: {
       padding: 16,
+      width: '100%',
+      maxWidth: 1024,
+      alignSelf: 'center',
     },
     sectionCard: {
       backgroundColor: colors.surface,
@@ -956,11 +1297,204 @@ const getStyles = (colors, isDarkMode) =>
       paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 6,
+      borderWidth: 1,
+      borderColor: 'rgba(56, 189, 248, 0.25)',
     },
     userRoleBadgeText: {
       color: '#38bdf8',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
+    refreshIconBtn: {
+      padding: 6,
+      borderRadius: 8,
+      backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    userFilterRow: {
+      marginVertical: 10,
+    },
+    userSearchBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      height: 38,
+    },
+    userSearchInput: {
+      flex: 1,
+      fontSize: 12.5,
+      color: colors.textPrimary,
+      paddingVertical: 0,
+    },
+    roleFilterChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 16,
+      backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+      marginRight: 6,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    roleFilterChipActive: {
+      backgroundColor: 'rgba(56, 189, 248, 0.15)',
+      borderColor: '#38bdf8',
+    },
+    roleFilterChipText: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      fontWeight: '600',
+    },
+    roleFilterChipTextActive: {
+      color: '#38bdf8',
+      fontWeight: '800',
+    },
+    userCardItem: {
+      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    userCardMainRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    userItemPhone: {
       fontSize: 10.5,
+      color: colors.textMuted,
+      marginTop: 2,
+    },
+    userStatusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 7,
+      paddingVertical: 2.5,
+      borderRadius: 6,
+      borderWidth: 1,
+    },
+    statusActiveBadge: {
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+    },
+    statusSuspendedBadge: {
+      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+      borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    statusDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      marginRight: 4,
+    },
+    statusDotActive: {
+      backgroundColor: '#10b981',
+    },
+    statusDotSuspended: {
+      backgroundColor: '#f59e0b',
+    },
+    userStatusText: {
+      fontSize: 9.5,
+      fontWeight: '800',
+      letterSpacing: 0.3,
+    },
+    statusTextActive: {
+      color: '#10b981',
+    },
+    statusTextSuspended: {
+      color: '#f59e0b',
+    },
+    userActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      marginTop: 8,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+      gap: 8,
+    },
+    statusToggleBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 6,
+      borderWidth: 1,
+    },
+    suspendBtn: {
+      backgroundColor: 'rgba(245, 158, 11, 0.1)',
+      borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    activateBtn: {
+      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+    },
+    statusToggleText: {
+      fontSize: 11,
       fontWeight: '700',
+    },
+    suspendText: {
+      color: '#f59e0b',
+    },
+    activateText: {
+      color: '#10b981',
+    },
+    editUserBtn: {
+      padding: 5,
+      borderRadius: 6,
+      backgroundColor: 'rgba(56, 189, 248, 0.1)',
+      borderWidth: 1,
+      borderColor: 'rgba(56, 189, 248, 0.25)',
+    },
+    deleteUserBtn: {
+      padding: 5,
+      borderRadius: 6,
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.25)',
+    },
+    emptyUsersBox: {
+      paddingVertical: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyUsersTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginTop: 8,
+    },
+    emptyUsersSub: {
+      fontSize: 11.5,
+      color: colors.textSecondary,
+      marginTop: 4,
+      textAlign: 'center',
+    },
+    roleSelectChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    roleSelectChipActive: {
+      backgroundColor: 'rgba(56, 189, 248, 0.15)',
+      borderColor: '#38bdf8',
+    },
+    roleSelectChipText: {
+      fontSize: 11.5,
+      color: colors.textSecondary,
+      fontWeight: '600',
+    },
+    roleSelectChipTextActive: {
+      color: '#38bdf8',
+      fontWeight: '800',
     },
     roleCard: {
       backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
@@ -1184,6 +1718,9 @@ const getStyles = (colors, isDarkMode) =>
       padding: 16,
       borderWidth: 1,
       borderColor: colors.cardBorder,
+      width: '100%',
+      maxWidth: 540,
+      alignSelf: 'center',
     },
     modalHeader: {
       flexDirection: 'row',

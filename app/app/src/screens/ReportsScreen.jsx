@@ -21,6 +21,9 @@ import apiClient from '../api/client';
 import { useAuthStore } from '../store/useStore';
 import { useThemeColors } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Animated Touchable Component
 const AnimatedTouchable = ({ children, onPress, style, disabled }) => {
@@ -28,7 +31,7 @@ const AnimatedTouchable = ({ children, onPress, style, disabled }) => {
 
   const handlePressIn = () => {
     Animated.spring(scaleValue, {
-      toValue: 0.96,
+      toValue: 0.97,
       useNativeDriver: true,
       speed: 20,
       bounciness: 6,
@@ -59,6 +62,36 @@ const AnimatedTouchable = ({ children, onPress, style, disabled }) => {
   );
 };
 
+// Helper to format header keys nicely (e.g. "tenantName" -> "Tenant Name")
+const formatHeaderKey = (key) => {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
+};
+
+// Helper to sanitize row objects into clean display values
+const sanitizeExportData = (data) => {
+  if (!data || !Array.isArray(data) || data.length === 0) return [];
+  return data.map((item) => {
+    const row = {};
+    Object.keys(item).forEach((k) => {
+      if (k === 'id' || k.toLowerCase().endsWith('id') || k === '__v') return;
+      const val = item[k];
+      if (val === null || val === undefined) {
+        row[formatHeaderKey(k)] = 'N/A';
+      } else if (typeof val === 'object') {
+        row[formatHeaderKey(k)] = val.name || val.unitNumber || JSON.stringify(val);
+      } else if (typeof val === 'boolean') {
+        row[formatHeaderKey(k)] = val ? 'Yes' : 'No';
+      } else {
+        row[formatHeaderKey(k)] = val;
+      }
+    });
+    return row;
+  });
+};
+
 export const ReportsScreen = () => {
   const logout = useAuthStore((state) => state.logout);
   const refreshAccessToken = useAuthStore((state) => state.refreshAccessToken);
@@ -75,6 +108,7 @@ export const ReportsScreen = () => {
   const [summaryData, setSummaryData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Selected item for Detailed Modal view
   const [viewingItem, setViewingItem] = useState(null);
@@ -97,11 +131,9 @@ export const ReportsScreen = () => {
 
   // Filter Modal state
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const [expandedFilterSection, setExpandedFilterSection] = useState(null); // 'property' | 'unit' | 'tenant' | 'status' | 'method' | 'priority' | null
+  const [expandedFilterSection, setExpandedFilterSection] = useState(null);
 
   // Animations
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   const isMountedRef = useRef(true);
@@ -112,25 +144,6 @@ export const ReportsScreen = () => {
       isMountedRef.current = false;
     };
   }, []);
-
-  const runEntryAnimation = () => {
-    fadeAnim.setValue(0);
-    slideAnim.setValue(15);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
 
   const spinReloadButton = () => {
     rotateAnim.setValue(0);
@@ -153,8 +166,10 @@ export const ReportsScreen = () => {
       id: 'rent-roll',
       title: 'Rent Roll Report',
       desc: 'Detailed breakdown of active rents, security deposits, and unit vacancy status across properties.',
-      icon: 'business-outline',
+      icon: 'document-text-outline',
       color: '#38bdf8',
+      bgColor: 'rgba(56, 189, 248, 0.12)',
+      borderColor: 'rgba(56, 189, 248, 0.25)',
       endpoint: '/reports/rent-roll',
     },
     {
@@ -162,7 +177,9 @@ export const ReportsScreen = () => {
       title: 'Occupancy Report',
       desc: 'Understand units performance, vacancies, and visual occupancy ratios across all buildings.',
       icon: 'pie-chart-outline',
-      color: '#10b981',
+      color: '#818cf8',
+      bgColor: 'rgba(129, 140, 248, 0.12)',
+      borderColor: 'rgba(129, 140, 248, 0.25)',
       endpoint: '/reports/occupancy',
     },
     {
@@ -170,7 +187,9 @@ export const ReportsScreen = () => {
       title: 'Delinquency Report',
       desc: 'Identifies overdue balances, late days, outstanding values, and tenant contacts info.',
       icon: 'alert-circle-outline',
-      color: '#ef4444',
+      color: '#f87171',
+      bgColor: 'rgba(248, 113, 113, 0.12)',
+      borderColor: 'rgba(248, 113, 113, 0.25)',
       endpoint: '/reports/delinquency',
     },
     {
@@ -178,15 +197,19 @@ export const ReportsScreen = () => {
       title: 'Profit & Loss Statement',
       desc: 'Attributed general ledger financial statement detailing rental income, expenses, and net profit.',
       icon: 'trending-up-outline',
-      color: '#a855f7',
+      color: '#34d399',
+      bgColor: 'rgba(52, 211, 153, 0.12)',
+      borderColor: 'rgba(52, 211, 153, 0.25)',
       endpoint: '/reports/profit-loss',
     },
     {
       id: 'maintenance',
       title: 'Maintenance Log Report',
       desc: 'Track maintenance requests, assigned vendors, technicians, completion rates, and actual costs.',
-      icon: 'hammer-outline',
-      color: '#f59e0b',
+      icon: 'construct-outline',
+      color: '#fbbf24',
+      bgColor: 'rgba(251, 191, 36, 0.12)',
+      borderColor: 'rgba(251, 191, 36, 0.25)',
       endpoint: '/reports/maintenance',
     },
     {
@@ -194,7 +217,9 @@ export const ReportsScreen = () => {
       title: 'Payment History Report',
       desc: 'Audit completed transactions, reference check numbers, payment methods, and statuses.',
       icon: 'card-outline',
-      color: '#06b6d4',
+      color: '#2dd4bf',
+      bgColor: 'rgba(45, 212, 191, 0.12)',
+      borderColor: 'rgba(45, 212, 191, 0.25)',
       endpoint: '/reports/payment-history',
     },
   ];
@@ -232,7 +257,6 @@ export const ReportsScreen = () => {
       if (showLoadingIndicator && reportData.length === 0) setLoading(true);
       spinReloadButton();
 
-      // Build query string matching web reportApi.ts buildQuery()
       const params = new URLSearchParams();
       if (selectedPropertyId) params.append('propertyId', selectedPropertyId);
       if (selectedUnitId) params.append('unitId', selectedUnitId);
@@ -253,15 +277,19 @@ export const ReportsScreen = () => {
 
       if (selectedReportId === 'profit-loss') {
         const payload = res?.data || res || {};
-        const plSummary =
-          payload.summary || payload.data?.summary || { totalIncome: 0, totalExpenses: 0, netProfit: 0 };
-        setSummaryData(plSummary);
-
         const incomes = (payload.income || payload.data?.income || []).map((i) => ({ ...i, type: 'Income' }));
         const expenses = (payload.expenses || payload.data?.expenses || []).map((e) => ({
           ...e,
           type: 'Expense',
         }));
+        const totalIncome = incomes.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+        const totalExpenses = expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+        const plSummary = payload.summary || payload.data?.summary || {
+          totalIncome,
+          totalExpenses,
+          netProfit: totalIncome - totalExpenses,
+        };
+        setSummaryData(plSummary);
         setReportData([...incomes, ...expenses]);
       } else {
         const list = Array.isArray(res?.data)
@@ -269,7 +297,56 @@ export const ReportsScreen = () => {
           : Array.isArray(res)
           ? res
           : [];
-        const summary = res?.summary || null;
+
+        // Exact fallback summary logic from Frontend web app
+        let summary = res?.summary || null;
+        if (!summary) {
+          if (selectedReportId === 'rent-roll') {
+            const occupiedCount = list.filter((i) => i.unitStatus === 'Occupied' || i.leaseStatus === 'Active').length;
+            summary = {
+              totalMonthlyRent: list.reduce((acc, curr) => acc + (Number(curr.monthlyRent) || 0), 0),
+              totalSecurityDeposits: list.reduce((acc, curr) => acc + (Number(curr.securityDeposit) || 0), 0),
+              occupiedCount,
+              vacantCount: Math.max(0, list.length - occupiedCount),
+              totalUnits: res?.pagination?.totalRecords || list.length,
+            };
+          } else if (selectedReportId === 'occupancy') {
+            const totalUnits = list.reduce((acc, curr) => acc + (Number(curr.totalUnits) || 0), 0);
+            const occupiedUnits = list.reduce((acc, curr) => acc + (Number(curr.occupiedUnits) || 0), 0);
+            const vacantUnits = list.reduce((acc, curr) => acc + (Number(curr.vacantUnits) || 0), 0);
+            summary = {
+              portfolioTotalUnits: totalUnits,
+              portfolioOccupiedUnits: occupiedUnits,
+              portfolioVacantUnits: vacantUnits,
+              overallOccupancyPercentage: totalUnits > 0 ? parseFloat(((occupiedUnits / totalUnits) * 100).toFixed(1)) : 0.0,
+              totalProperties: res?.pagination?.totalRecords || list.length,
+            };
+          } else if (selectedReportId === 'delinquency') {
+            summary = {
+              totalDelinquentBalance: list.reduce((acc, curr) => acc + (Number(curr.outstandingBalance) || 0), 0),
+              totalOriginalAmount: list.reduce((acc, curr) => acc + (Number(curr.rentAmount) || 0), 0),
+              totalDelinquentTenants: new Set(list.map((i) => i.tenantName)).size,
+              totalDelinquentInvoices: res?.pagination?.totalRecords || list.length,
+              averageDaysLate: list.length > 0 ? Math.round(list.reduce((acc, curr) => acc + (Number(curr.daysLate) || 0), 0) / list.length) : 0,
+            };
+          } else if (selectedReportId === 'maintenance') {
+            const completedCount = list.filter((i) => i.status === 'Completed' || i.status === 'Closed').length;
+            summary = {
+              totalWorkOrders: res?.pagination?.totalRecords || list.length,
+              totalEstimatedCost: list.reduce((acc, curr) => acc + (Number(curr.estimatedCost) || 0), 0),
+              totalActualCost: list.reduce((acc, curr) => acc + (Number(curr.actualCost || curr.estimatedCost) || 0), 0),
+              completedCount,
+              completionRate: list.length > 0 ? parseFloat(((completedCount / list.length) * 100).toFixed(1)) : 0.0,
+            };
+          } else if (selectedReportId === 'payment-history') {
+            summary = {
+              totalCollectedAmount: list.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0),
+              totalTransactions: res?.pagination?.totalRecords || list.length,
+              averageTransaction: list.length > 0 ? Math.round(list.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0) / list.length) : 0,
+              topMethod: list.length > 0 ? list[0].paymentMethod || 'ACH' : 'N/A',
+            };
+          }
+        }
         setSummaryData(summary);
         setReportData(list);
       }
@@ -319,17 +396,16 @@ export const ReportsScreen = () => {
     setSummaryData(null);
     setViewingItem(null);
     setSelectedReportId(rep.id);
-    runEntryAnimation();
   };
 
   const handleBack = () => {
     setSelectedReportId(null);
     setReportTitle('');
+    setReportDesc('');
     setReportData([]);
     setSummaryData(null);
     setViewingItem(null);
     setExpandedFilterSection(null);
-    runEntryAnimation();
   };
 
   const resetFilters = () => {
@@ -348,6 +424,150 @@ export const ReportsScreen = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchReportData(false);
+  };
+
+  // Export handler matching Frontend web app export functionality
+  const handleExport = async (fileType) => {
+    if (!reportData || reportData.length === 0) {
+      Alert.alert('Notice', 'No report data available to export.');
+      return;
+    }
+
+    setIsExporting(true);
+    const sanitized = sanitizeExportData(reportData);
+    if (sanitized.length === 0) {
+      setIsExporting(false);
+      Alert.alert('Notice', 'No records to export.');
+      return;
+    }
+
+    const reportSlug = (selectedReportId || 'report').replace(/-/g, '_');
+    const timestamp = Date.now();
+    const fileName = `${reportSlug}_report_${timestamp}`;
+
+    // Silent background export audit log to backend
+    apiClient
+      .post(
+        '/reports/exports',
+        {
+          reportType: reportSlug.toUpperCase(),
+          filters: {
+            propertyId: selectedPropertyId,
+            unitId: selectedUnitId,
+            tenantId: selectedTenantId,
+            status: selectedStatus,
+            startDate,
+            endDate,
+          },
+          fileName: `${fileName}.${fileType.toLowerCase()}`,
+          fileType,
+        },
+        logout,
+        refreshAccessToken
+      )
+      .catch((err) => console.log('Audit log export error:', err?.message || err));
+
+    try {
+      if (fileType === 'CSV' || fileType === 'XLSX') {
+        const headers = Object.keys(sanitized[0]);
+        const csvRows = [
+          headers.join(','),
+          ...sanitized.map((row) =>
+            headers
+              .map((h) => {
+                const val = row[h] === null || row[h] === undefined ? '' : String(row[h]);
+                return `"${val.replace(/"/g, '""')}"`;
+              })
+              .join(',')
+          ),
+        ];
+
+        const csvContent = '\uFEFF' + csvRows.join('\n');
+        const ext = fileType === 'CSV' ? 'csv' : 'csv';
+        const fileUri = `${FileSystem.cacheDirectory}${fileName}.${ext}`;
+
+        await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: fileType === 'CSV' ? 'text/csv' : 'application/vnd.ms-excel',
+            dialogTitle: `Export ${reportTitle} (${fileType})`,
+          });
+        } else {
+          Alert.alert('Export Complete', `File saved as ${fileName}.${ext}`);
+        }
+      } else if (fileType === 'PDF') {
+        const headers = Object.keys(sanitized[0]);
+        const tableHeaderHtml = headers
+          .map(
+            (h) =>
+              `<th style="border: 1px solid #cbd5e1; padding: 8px 10px; background-color: #f1f5f9; color: #1e293b; font-size: 11px; text-align: left; font-weight: 700;">${h}</th>`
+          )
+          .join('');
+
+        const tableBodyHtml = sanitized
+          .map(
+            (row, idx) =>
+              `<tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">` +
+              headers
+                .map(
+                  (h) =>
+                    `<td style="border: 1px solid #e2e8f0; padding: 7px 10px; font-size: 10px; color: #334155;">${row[h]}</td>`
+                )
+                .join('') +
+              '</tr>'
+          )
+          .join('');
+
+        const html = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <title>${reportTitle}</title>
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #0f172a; margin: 0; }
+                h1 { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0 0 6px 0; }
+                p.desc { font-size: 11px; color: #64748b; margin: 0 0 16px 0; }
+                .meta { font-size: 9px; color: #94a3b8; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+              </style>
+            </head>
+            <body>
+              <h1>${reportTitle}</h1>
+              <p class="desc">${reportDesc || 'Run, audit, and export multi-tenant property reports.'}</p>
+              <div class="meta">Generated: ${new Date().toLocaleString()} | Total Records: ${sanitized.length}</div>
+              <table>
+                <thead>
+                  <tr>${tableHeaderHtml}</tr>
+                </thead>
+                <tbody>
+                  ${tableBodyHtml}
+                </tbody>
+              </table>
+            </body>
+          </html>
+        `;
+
+        const { uri } = await Print.printToFileAsync({ html });
+
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: `Export ${reportTitle} (PDF)`,
+          });
+        } else {
+          Alert.alert('Export Complete', 'PDF generated successfully.');
+        }
+      }
+    } catch (error) {
+      console.log('Export failed:', error);
+      Alert.alert('Export Error', 'Could not export file. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Get active filter count
@@ -379,7 +599,7 @@ export const ReportsScreen = () => {
     });
   });
 
-  // Status and filter choice generators
+  // Status choice options
   const getStatusChoices = () => {
     if (selectedReportId === 'rent-roll') {
       return [
@@ -388,6 +608,7 @@ export const ReportsScreen = () => {
         { label: 'Draft', value: 'Draft' },
         { label: 'Pending Move In', value: 'Pending_Move_In' },
         { label: 'Terminated', value: 'Terminated' },
+        { label: 'Expired', value: 'Expired' },
       ];
     }
     if (selectedReportId === 'delinquency') {
@@ -417,50 +638,67 @@ export const ReportsScreen = () => {
 
   return (
     <View style={styles.mainWrapper}>
-      {/* 1. REPORT MAIN DIRECTORY VIEW */}
+      {/* 1. REPORT MAIN DIRECTORY VIEW (MATCHING FRONTEND PHOTO 1) */}
       {selectedReportId === null ? (
         <>
-          {/* Fixed Header */}
+          {/* Header */}
           <View style={[styles.fixedHeader, { paddingTop: Platform.OS === 'ios' ? 48 : 16 }]}>
-            <Text style={styles.title} allowFontScaling={false}>Operational & Financial Reports</Text>
+            <Text style={styles.title} allowFontScaling={false}>Reports</Text>
             <Text style={styles.subtitle} allowFontScaling={false}>
-              Audit portfolio metrics, vacancies, delinquencies, profit losses statements, and cash flows.
+              Run, audit, and export multi-tenant property reports.
             </Text>
           </View>
 
           {/* Scrollable list of Report Cards */}
           <ScrollView
             style={styles.container}
-            contentContainerStyle={[styles.scrollContent, { paddingTop: 10 }]}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: 14 }]}
             showsVerticalScrollIndicator={false}
           >
-            <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+            <View style={{ width: '100%' }}>
               {reportsList.map((rep) => (
                 <AnimatedTouchable
                   key={rep.id}
                   style={styles.repCard}
                   onPress={() => handleSelectReport(rep)}
                 >
-                  <View style={[styles.cardIconBox, { backgroundColor: `${rep.color}15` }]}>
-                    <Ionicons name={rep.icon} size={24} color={rep.color} />
+                  <View style={styles.repCardHeader}>
+                    <View style={[styles.cardIconBox, { backgroundColor: rep.bgColor, borderColor: rep.borderColor }]}>
+                      <Ionicons name={rep.icon} size={24} color={rep.color} />
+                    </View>
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardTitle} allowFontScaling={false}>{rep.title}</Text>
+                      <Text style={styles.cardDesc} allowFontScaling={false}>{rep.desc}</Text>
+                    </View>
                   </View>
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardTitle} allowFontScaling={false}>{rep.title}</Text>
-                    <Text style={styles.cardDesc} allowFontScaling={false}>{rep.desc}</Text>
+
+                  <View style={styles.generateReportRow}>
+                    <Text style={styles.generateReportText} allowFontScaling={false}>Generate Report</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#38bdf8" />
                   </View>
-                  <Ionicons name="chevron-forward-outline" size={18} color="#64748b" />
                 </AnimatedTouchable>
               ))}
-            </Animated.View>
+
+              {/* Reporting Export & Audit Center Card */}
+              <View style={styles.auditCenterCard}>
+                <View style={styles.auditCenterHeader}>
+                  <Ionicons name="shield-checkmark" size={18} color="#6366f1" />
+                  <Text style={styles.auditCenterTitle} allowFontScaling={false}>Reporting Export & Audit Center</Text>
+                </View>
+                <Text style={styles.auditCenterDesc} allowFontScaling={false}>
+                  Large datasets exceeding local export limits are compiled in the background to ensure fast dashboard rendering. All export jobs are isolated by company access logs and stored securely for audit references.
+                </Text>
+              </View>
+            </View>
           </ScrollView>
         </>
       ) : (
-        // 2. DETAILED REPORT VIEWER VIEW
+        // 2. DETAILED REPORT VIEWER (MATCHING FRONTEND PHOTO 2)
         <>
-          {/* Header with back action, title, search and filters toggle */}
+          {/* Header with back action, title, subtitle */}
           <View style={[styles.fixedHeader, { paddingTop: Platform.OS === 'ios' ? 48 : 16 }]}>
             <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-              <Ionicons name="arrow-back-outline" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
+              <Ionicons name="chevron-back" size={18} color="#38bdf8" style={{ marginRight: 4 }} />
               <Text style={styles.backBtnText} allowFontScaling={false}>Back to Reports</Text>
             </TouchableOpacity>
 
@@ -469,15 +707,54 @@ export const ReportsScreen = () => {
                 {reportTitle}
               </Text>
             </View>
+            <Text style={styles.subtitle} numberOfLines={2} allowFontScaling={false}>
+              {reportDesc}
+            </Text>
+
+            {/* Export Options Bar: CSV | Excel | PDF */}
+            <View style={styles.exportBar}>
+              <Text style={styles.exportLabel} allowFontScaling={false}>Export Options:</Text>
+              <View style={styles.exportButtonsRow}>
+                <TouchableOpacity
+                  style={styles.exportBtn}
+                  onPress={() => handleExport('CSV')}
+                  disabled={isExporting}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="document-text-outline" size={13} color="#38bdf8" />
+                  <Text style={styles.exportBtnText} allowFontScaling={false}>CSV</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.exportBtn}
+                  onPress={() => handleExport('XLSX')}
+                  disabled={isExporting}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="grid-outline" size={13} color="#10b981" />
+                  <Text style={styles.exportBtnText} allowFontScaling={false}>Excel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.exportBtn}
+                  onPress={() => handleExport('PDF')}
+                  disabled={isExporting}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="newspaper-outline" size={13} color="#ef4444" />
+                  <Text style={styles.exportBtnText} allowFontScaling={false}>PDF</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
             {/* Quick Actions Row: Search, Reload, Filters */}
-            <View style={[styles.searchBarRow, { marginTop: 10 }]}>
+            <View style={[styles.searchBarRow, { marginTop: 8 }]}>
               {/* Realtime Search Bar */}
               <View style={styles.searchContainer}>
-                <Ionicons name="search-outline" size={16} color="#64748b" style={{ marginRight: 6 }} />
+                <Ionicons name="search-outline" size={15} color="#64748b" style={{ marginRight: 6 }} />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Search records by name, unit, amount..."
+                  placeholder="Search accounts, names, units..."
                   placeholderTextColor="#64748b"
                   value={searchQuery}
                   onChangeText={(text) => setSearchQuery(text)}
@@ -487,7 +764,7 @@ export const ReportsScreen = () => {
                 />
                 {searchQuery.length > 0 && (
                   <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                    <Ionicons name="close-circle" size={15} color="#94a3b8" />
                   </TouchableOpacity>
                 )}
               </View>
@@ -500,7 +777,7 @@ export const ReportsScreen = () => {
                 activeOpacity={0.7}
               >
                 <Animated.View style={{ transform: [{ rotate: spinInterpolation }] }}>
-                  <Ionicons name="refresh-outline" size={17} color={loading ? '#38bdf8' : '#cbd5e1'} />
+                  <Ionicons name="refresh-outline" size={16} color={loading ? '#38bdf8' : '#cbd5e1'} />
                 </Animated.View>
               </TouchableOpacity>
 
@@ -512,7 +789,7 @@ export const ReportsScreen = () => {
               >
                 <Ionicons
                   name="funnel-outline"
-                  size={14}
+                  size={13}
                   color={activeFilterCount > 0 ? '#ffffff' : '#0f172a'}
                 />
                 <Text
@@ -523,15 +800,15 @@ export const ReportsScreen = () => {
                 </Text>
               </TouchableOpacity>
 
-              {/* Reset Filters Icon if any filter active */}
+              {/* Unfilter Button */}
               {activeFilterCount > 0 && (
                 <TouchableOpacity
-                  style={styles.clearFilterBtn}
+                  style={styles.unfilterBtn}
                   onPress={resetFilters}
                   activeOpacity={0.7}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
-                  <Ionicons name="close" size={15} color="#ef4444" />
+                  <Ionicons name="refresh" size={13} color="#f43f5e" />
+                  <Text style={styles.unfilterText} allowFontScaling={false}>Unfilter</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -550,33 +827,56 @@ export const ReportsScreen = () => {
                 <Text style={styles.loadingText} allowFontScaling={false}>Loading report data...</Text>
               </View>
             ) : (
-              <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-                {/* --- 1. RENT ROLL REPORT SUMMARY CARDS --- */}
+              <View style={{ width: '100%' }}>
+                {/* --- 1. RENT ROLL REPORT SUMMARY CARDS (PHOTO 2 EXACT MATCH) --- */}
                 {selectedReportId === 'rent-roll' && summaryData && (
                   <View style={styles.kpiGrid}>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#38bdf8' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>TOTAL MONTHLY RENT</Text>
-                      <Text style={[styles.kpiValue, { color: '#38bdf8' }]} allowFontScaling={false}>
-                        ${Number(summaryData.totalMonthlyRent || 0).toLocaleString()}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(16, 185, 129, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#10b981' }]} allowFontScaling={false}>TOTAL MONTHLY RENT</Text>
+                        <Text style={[styles.kpiValue, { color: isDarkMode ? '#ecfdf5' : '#064e3b' }]} allowFontScaling={false}>
+                          ${Number(summaryData.totalMonthlyRent || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                        <Ionicons name="cash-outline" size={20} color="#10b981" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#10b981' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>SECURITY DEPOSITS</Text>
-                      <Text style={[styles.kpiValue, { color: '#10b981' }]} allowFontScaling={false}>
-                        ${Number(summaryData.totalSecurityDeposits || 0).toLocaleString()}
-                      </Text>
+
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(99, 102, 241, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#6366f1' }]} allowFontScaling={false}>SECURITY DEPOSITS HELD</Text>
+                        <Text style={[styles.kpiValue, { color: isDarkMode ? '#eef2ff' : '#1e1b4b' }]} allowFontScaling={false}>
+                          ${Number(summaryData.totalSecurityDeposits || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.15)' }]}>
+                        <Ionicons name="shield-checkmark-outline" size={20} color="#6366f1" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#a855f7' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>OCCUPIED UNITS</Text>
-                      <Text style={[styles.kpiValue, { color: '#a855f7' }]} allowFontScaling={false}>
-                        {summaryData.occupiedCount} / {summaryData.totalUnits}
-                      </Text>
+
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(148, 163, 184, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#94a3b8' }]} allowFontScaling={false}>PORTFOLIO UNITS</Text>
+                        <Text style={[styles.kpiValue, { color: colors.textPrimary }]} allowFontScaling={false}>
+                          {summaryData.totalUnits} Units
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(148, 163, 184, 0.15)' }]}>
+                        <Ionicons name="business-outline" size={20} color="#94a3b8" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#f59e0b' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>VACANT UNITS</Text>
-                      <Text style={[styles.kpiValue, { color: '#f59e0b' }]} allowFontScaling={false}>
-                        {summaryData.vacantCount}
-                      </Text>
+
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(56, 189, 248, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#38bdf8' }]} allowFontScaling={false}>OCCUPIED / VACANT</Text>
+                        <Text style={[styles.kpiValue, { color: colors.textPrimary }]} allowFontScaling={false}>
+                          {summaryData.occupiedCount} Occ / {summaryData.vacantCount} Vac
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                        <Ionicons name="checkmark-circle-outline" size={20} color="#38bdf8" />
+                      </View>
                     </View>
                   </View>
                 )}
@@ -584,29 +884,49 @@ export const ReportsScreen = () => {
                 {/* --- 2. OCCUPANCY REPORT SUMMARY CARDS --- */}
                 {selectedReportId === 'occupancy' && summaryData && (
                   <View style={styles.kpiGrid}>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#10b981' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>OVERALL OCCUPANCY</Text>
-                      <Text style={[styles.kpiValue, { color: '#10b981' }]} allowFontScaling={false}>
-                        {summaryData.overallOccupancyPercentage}%
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(16, 185, 129, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#10b981' }]} allowFontScaling={false}>OVERALL OCCUPANCY</Text>
+                        <Text style={[styles.kpiValue, { color: '#10b981' }]} allowFontScaling={false}>
+                          {summaryData.overallOccupancyPercentage}%
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                        <Ionicons name="pie-chart-outline" size={20} color="#10b981" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#38bdf8' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>TOTAL UNITS</Text>
-                      <Text style={[styles.kpiValue, { color: '#38bdf8' }]} allowFontScaling={false}>
-                        {summaryData.portfolioTotalUnits}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(56, 189, 248, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#38bdf8' }]} allowFontScaling={false}>TOTAL UNITS</Text>
+                        <Text style={[styles.kpiValue, { color: colors.textPrimary }]} allowFontScaling={false}>
+                          {summaryData.portfolioTotalUnits}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                        <Ionicons name="business-outline" size={20} color="#38bdf8" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#10b981' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>OCCUPIED UNITS</Text>
-                      <Text style={[styles.kpiValue, { color: '#10b981' }]} allowFontScaling={false}>
-                        {summaryData.portfolioOccupiedUnits}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(129, 140, 248, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#818cf8' }]} allowFontScaling={false}>OCCUPIED UNITS</Text>
+                        <Text style={[styles.kpiValue, { color: '#818cf8' }]} allowFontScaling={false}>
+                          {summaryData.portfolioOccupiedUnits}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(129, 140, 248, 0.15)' }]}>
+                        <Ionicons name="person-outline" size={20} color="#818cf8" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#f59e0b' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>VACANT UNITS</Text>
-                      <Text style={[styles.kpiValue, { color: '#f59e0b' }]} allowFontScaling={false}>
-                        {summaryData.portfolioVacantUnits}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(251, 191, 36, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#fbbf24' }]} allowFontScaling={false}>VACANT UNITS</Text>
+                        <Text style={[styles.kpiValue, { color: '#fbbf24' }]} allowFontScaling={false}>
+                          {summaryData.portfolioVacantUnits}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(251, 191, 36, 0.15)' }]}>
+                        <Ionicons name="key-outline" size={20} color="#fbbf24" />
+                      </View>
                     </View>
                   </View>
                 )}
@@ -614,29 +934,49 @@ export const ReportsScreen = () => {
                 {/* --- 3. DELINQUENCY REPORT SUMMARY CARDS --- */}
                 {selectedReportId === 'delinquency' && summaryData && (
                   <View style={styles.kpiGrid}>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#ef4444' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>DELINQUENT BALANCE</Text>
-                      <Text style={[styles.kpiValue, { color: '#ef4444' }]} allowFontScaling={false}>
-                        ${Number(summaryData.totalDelinquentBalance || 0).toLocaleString()}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(239, 68, 68, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#ef4444' }]} allowFontScaling={false}>DELINQUENT BALANCE</Text>
+                        <Text style={[styles.kpiValue, { color: '#ef4444' }]} allowFontScaling={false}>
+                          ${Number(summaryData.totalDelinquentBalance || 0).toLocaleString()}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+                        <Ionicons name="alert-circle-outline" size={20} color="#ef4444" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#f59e0b' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>DELINQUENT TENANTS</Text>
-                      <Text style={[styles.kpiValue, { color: '#f59e0b' }]} allowFontScaling={false}>
-                        {summaryData.totalDelinquentTenants}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(251, 191, 36, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#fbbf24' }]} allowFontScaling={false}>DELINQUENT TENANTS</Text>
+                        <Text style={[styles.kpiValue, { color: '#fbbf24' }]} allowFontScaling={false}>
+                          {summaryData.totalDelinquentTenants}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(251, 191, 36, 0.15)' }]}>
+                        <Ionicons name="people-outline" size={20} color="#fbbf24" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#38bdf8' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>OVERDUE INVOICES</Text>
-                      <Text style={[styles.kpiValue, { color: '#38bdf8' }]} allowFontScaling={false}>
-                        {summaryData.totalDelinquentInvoices}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(56, 189, 248, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#38bdf8' }]} allowFontScaling={false}>OVERDUE INVOICES</Text>
+                        <Text style={[styles.kpiValue, { color: '#38bdf8' }]} allowFontScaling={false}>
+                          {summaryData.totalDelinquentInvoices}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                        <Ionicons name="receipt-outline" size={20} color="#38bdf8" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#a855f7' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>AVERAGE DAYS LATE</Text>
-                      <Text style={[styles.kpiValue, { color: '#a855f7' }]} allowFontScaling={false}>
-                        {summaryData.averageDaysLate} Days
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(168, 85, 247, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#a855f7' }]} allowFontScaling={false}>AVERAGE DAYS LATE</Text>
+                        <Text style={[styles.kpiValue, { color: '#a855f7' }]} allowFontScaling={false}>
+                          {summaryData.averageDaysLate} Days
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
+                        <Ionicons name="time-outline" size={20} color="#a855f7" />
+                      </View>
                     </View>
                   </View>
                 )}
@@ -644,20 +984,20 @@ export const ReportsScreen = () => {
                 {/* --- 4. PROFIT & LOSS STATEMENT SUMMARY CARDS --- */}
                 {selectedReportId === 'profit-loss' && summaryData && (
                   <View style={styles.pnLSummaryRow}>
-                    <View style={[styles.pnLSummaryBox, { borderLeftColor: '#10b981' }]}>
-                      <Text style={styles.pnLSummaryLabel} allowFontScaling={false}>GROSS INCOME</Text>
+                    <View style={[styles.pnLSummaryBox, { borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
+                      <Text style={[styles.pnLSummaryLabel, { color: '#10b981' }]} allowFontScaling={false}>GROSS INCOME</Text>
                       <Text style={[styles.pnLSummaryVal, { color: '#10b981' }]} allowFontScaling={false}>
                         ${Number(summaryData.totalIncome || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </Text>
                     </View>
-                    <View style={[styles.pnLSummaryBox, { borderLeftColor: '#ef4444' }]}>
-                      <Text style={styles.pnLSummaryLabel} allowFontScaling={false}>TOTAL EXPENSES</Text>
+                    <View style={[styles.pnLSummaryBox, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
+                      <Text style={[styles.pnLSummaryLabel, { color: '#ef4444' }]} allowFontScaling={false}>TOTAL EXPENSES</Text>
                       <Text style={[styles.pnLSummaryVal, { color: '#ef4444' }]} allowFontScaling={false}>
                         -${Number(summaryData.totalExpenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </Text>
                     </View>
-                    <View style={[styles.pnLSummaryBox, { borderLeftColor: '#38bdf8' }]}>
-                      <Text style={styles.pnLSummaryLabel} allowFontScaling={false}>NET PROFIT</Text>
+                    <View style={[styles.pnLSummaryBox, { borderColor: 'rgba(56, 189, 248, 0.3)' }]}>
+                      <Text style={[styles.pnLSummaryLabel, { color: '#38bdf8' }]} allowFontScaling={false}>NET PROFIT</Text>
                       <Text style={[styles.pnLSummaryVal, { color: '#38bdf8' }]} allowFontScaling={false}>
                         ${Number(summaryData.netProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </Text>
@@ -668,29 +1008,49 @@ export const ReportsScreen = () => {
                 {/* --- 5. MAINTENANCE REPORT SUMMARY CARDS --- */}
                 {selectedReportId === 'maintenance' && summaryData && (
                   <View style={styles.kpiGrid}>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#38bdf8' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>TOTAL WORK ORDERS</Text>
-                      <Text style={[styles.kpiValue, { color: '#38bdf8' }]} allowFontScaling={false}>
-                        {summaryData.totalWorkOrders}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(56, 189, 248, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#38bdf8' }]} allowFontScaling={false}>TOTAL WORK ORDERS</Text>
+                        <Text style={[styles.kpiValue, { color: '#38bdf8' }]} allowFontScaling={false}>
+                          {summaryData.totalWorkOrders}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                        <Ionicons name="construct-outline" size={20} color="#38bdf8" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#f59e0b' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>ESTIMATED COST</Text>
-                      <Text style={[styles.kpiValue, { color: '#f59e0b' }]} allowFontScaling={false}>
-                        ${Number(summaryData.totalEstimatedCost || 0).toLocaleString()}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(251, 191, 36, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#fbbf24' }]} allowFontScaling={false}>ESTIMATED COST</Text>
+                        <Text style={[styles.kpiValue, { color: '#fbbf24' }]} allowFontScaling={false}>
+                          ${Number(summaryData.totalEstimatedCost || 0).toLocaleString()}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(251, 191, 36, 0.15)' }]}>
+                        <Ionicons name="cash-outline" size={20} color="#fbbf24" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#10b981' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>ACTUAL COST</Text>
-                      <Text style={[styles.kpiValue, { color: '#10b981' }]} allowFontScaling={false}>
-                        ${Number(summaryData.totalActualCost || 0).toLocaleString()}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(16, 185, 129, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#10b981' }]} allowFontScaling={false}>ACTUAL COST</Text>
+                        <Text style={[styles.kpiValue, { color: '#10b981' }]} allowFontScaling={false}>
+                          ${Number(summaryData.totalActualCost || 0).toLocaleString()}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                        <Ionicons name="wallet-outline" size={20} color="#10b981" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#a855f7' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>COMPLETION RATE</Text>
-                      <Text style={[styles.kpiValue, { color: '#a855f7' }]} allowFontScaling={false}>
-                        {summaryData.completionRate}%
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(168, 85, 247, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#a855f7' }]} allowFontScaling={false}>COMPLETION RATE</Text>
+                        <Text style={[styles.kpiValue, { color: '#a855f7' }]} allowFontScaling={false}>
+                          {summaryData.completionRate}%
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
+                        <Ionicons name="checkmark-done-circle-outline" size={20} color="#a855f7" />
+                      </View>
                     </View>
                   </View>
                 )}
@@ -698,29 +1058,49 @@ export const ReportsScreen = () => {
                 {/* --- 6. PAYMENT HISTORY REPORT SUMMARY CARDS --- */}
                 {selectedReportId === 'payment-history' && summaryData && (
                   <View style={styles.kpiGrid}>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#10b981' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>TOTAL COLLECTED</Text>
-                      <Text style={[styles.kpiValue, { color: '#10b981' }]} allowFontScaling={false}>
-                        ${Number(summaryData.totalCollectedAmount || 0).toLocaleString()}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(16, 185, 129, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#10b981' }]} allowFontScaling={false}>TOTAL COLLECTED</Text>
+                        <Text style={[styles.kpiValue, { color: '#10b981' }]} allowFontScaling={false}>
+                          ${Number(summaryData.totalCollectedAmount || 0).toLocaleString()}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                        <Ionicons name="cash-outline" size={20} color="#10b981" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#38bdf8' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>TRANSACTIONS</Text>
-                      <Text style={[styles.kpiValue, { color: '#38bdf8' }]} allowFontScaling={false}>
-                        {summaryData.totalTransactions}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(56, 189, 248, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#38bdf8' }]} allowFontScaling={false}>TRANSACTIONS</Text>
+                        <Text style={[styles.kpiValue, { color: '#38bdf8' }]} allowFontScaling={false}>
+                          {summaryData.totalTransactions}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                        <Ionicons name="card-outline" size={20} color="#38bdf8" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#a855f7' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>AVERAGE PAYMENT</Text>
-                      <Text style={[styles.kpiValue, { color: '#a855f7' }]} allowFontScaling={false}>
-                        ${Number(summaryData.averageTransaction || 0).toLocaleString()}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(168, 85, 247, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#a855f7' }]} allowFontScaling={false}>AVERAGE PAYMENT</Text>
+                        <Text style={[styles.kpiValue, { color: '#a855f7' }]} allowFontScaling={false}>
+                          ${Number(summaryData.averageTransaction || 0).toLocaleString()}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
+                        <Ionicons name="analytics-outline" size={20} color="#a855f7" />
+                      </View>
                     </View>
-                    <View style={[styles.kpiCard, { borderLeftColor: '#f59e0b' }]}>
-                      <Text style={styles.kpiLabel} allowFontScaling={false}>TOP METHOD</Text>
-                      <Text style={[styles.kpiValue, { color: '#f59e0b' }]} allowFontScaling={false}>
-                        {summaryData.topMethod || 'ACH'}
-                      </Text>
+                    <View style={[styles.kpiCard, { borderColor: 'rgba(251, 191, 36, 0.25)' }]}>
+                      <View style={styles.kpiTextCol}>
+                        <Text style={[styles.kpiLabel, { color: '#fbbf24' }]} allowFontScaling={false}>TOP METHOD</Text>
+                        <Text style={[styles.kpiValue, { color: '#fbbf24' }]} allowFontScaling={false}>
+                          {summaryData.topMethod || 'ACH'}
+                        </Text>
+                      </View>
+                      <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(251, 191, 36, 0.15)' }]}>
+                        <Ionicons name="swap-horizontal-outline" size={20} color="#fbbf24" />
+                      </View>
                     </View>
                   </View>
                 )}
@@ -739,23 +1119,25 @@ export const ReportsScreen = () => {
                     <Text style={styles.emptyText} allowFontScaling={false}>No records matching filter criteria.</Text>
                     <Text style={styles.emptySubText} allowFontScaling={false}>Try adjusting or resetting active filters.</Text>
                     {(activeFilterCount > 0 || searchQuery.length > 0) && (
-                      <TouchableOpacity style={styles.emptyResetBtn} onPress={() => resetFilters(true)}>
+                      <TouchableOpacity style={styles.emptyResetBtn} onPress={() => resetFilters()}>
                         <Text style={styles.emptyResetBtnText} allowFontScaling={false}>Reset All Filters</Text>
                       </TouchableOpacity>
                     )}
                   </View>
                 ) : (
-                  // RECORD CARDS WITH VIEW DETAILS ICON (MATCHING WEB REPORTTABLE)
+                  // RECORD CARDS (MATCHING FRONTEND TABLE ROWS IN PHOTO 2)
                   filteredData.map((item, idx) => (
                     <View key={item.id || idx} style={styles.reportCard}>
                       {/* Top Header of Card */}
                       <View style={styles.rowBetween}>
                         <View style={{ flex: 1, marginRight: 8 }}>
                           <Text style={styles.recordLabel} numberOfLines={1} allowFontScaling={false}>
-                            {item.propertyName || item.tenantName || item.name || `Record #${idx + 1}`}
+                            {item.propertyName || item.name || `Property #${idx + 1}`}
                           </Text>
                           {item.unitNumber && (
-                            <Text style={styles.recordSubText} allowFontScaling={false}>Unit {item.unitNumber}</Text>
+                            <Text style={styles.recordSubText} allowFontScaling={false}>
+                              Unit {item.unitNumber}
+                            </Text>
                           )}
                         </View>
 
@@ -771,39 +1153,102 @@ export const ReportsScreen = () => {
 
                       <View style={styles.cardDivider} />
 
-                      {/* Specific fields depending on report type */}
+                      {/* --- RENT ROLL ROW FIELDS (PHOTO 2 EXACT MATCH) --- */}
                       {selectedReportId === 'rent-roll' && (
-                        <View style={styles.fieldsGrid}>
-                          <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>TENANT</Text>
-                            <Text style={styles.fieldVal} allowFontScaling={false}>{item.tenantName || 'Vacant'}</Text>
+                        <View>
+                          <View style={styles.cardDetailRow}>
+                            <View style={styles.detailItem}>
+                              <Text style={styles.detailLabel} allowFontScaling={false}>TENANT NAME</Text>
+                              <Text style={styles.detailValue} numberOfLines={1} allowFontScaling={false}>
+                                {item.tenantName || 'Vacant'}
+                              </Text>
+                            </View>
+                            <View style={[styles.detailItem, { alignItems: 'flex-end' }]}>
+                              <Text style={styles.detailLabel} allowFontScaling={false}>LEASE STATUS</Text>
+                              <View
+                                style={[
+                                  styles.statusBadge,
+                                  item.leaseStatus === 'Active'
+                                    ? styles.statusActive
+                                    : item.leaseStatus === 'Pending_Move_In'
+                                    ? styles.statusPending
+                                    : styles.statusTerminated,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.statusText,
+                                    item.leaseStatus === 'Active'
+                                      ? styles.statusTextActive
+                                      : item.leaseStatus === 'Pending_Move_In'
+                                      ? styles.statusTextPending
+                                      : styles.statusTextTerminated,
+                                  ]}
+                                  allowFontScaling={false}
+                                >
+                                  {item.leaseStatus || 'N/A'}
+                                </Text>
+                              </View>
+                            </View>
                           </View>
-                          <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>MONTHLY RENT</Text>
-                            <Text style={[styles.fieldVal, { color: '#38bdf8', fontWeight: '800' }]} allowFontScaling={false}>
-                              ${Number(item.monthlyRent || 0).toLocaleString()}
-                            </Text>
+
+                          <View style={[styles.cardDetailRow, { marginTop: 8 }]}>
+                            <View style={styles.detailItem}>
+                              <Text style={styles.detailLabel} allowFontScaling={false}>MONTHLY RENT</Text>
+                              <Text style={[styles.detailValue, { color: '#10b981', fontWeight: '900' }]} allowFontScaling={false}>
+                                ${Number(item.monthlyRent || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </Text>
+                            </View>
+
+                            <View style={styles.detailItem}>
+                              <Text style={styles.detailLabel} allowFontScaling={false}>SECURITY DEPOSIT</Text>
+                              <Text style={[styles.detailValue, { color: '#6366f1', fontWeight: '900' }]} allowFontScaling={false}>
+                                ${Number(item.securityDeposit || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </Text>
+                            </View>
+
+                            <View style={[styles.detailItem, { alignItems: 'flex-end' }]}>
+                              <Text style={styles.detailLabel} allowFontScaling={false}>UNIT STATUS</Text>
+                              <View
+                                style={[
+                                  styles.unitStatusBadge,
+                                  item.unitStatus === 'Occupied' ? styles.unitOccupied : styles.unitVacant,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.unitStatusText,
+                                    item.unitStatus === 'Occupied' ? styles.unitTextOccupied : styles.unitTextVacant,
+                                  ]}
+                                  allowFontScaling={false}
+                                >
+                                  {item.unitStatus || 'N/A'}
+                                </Text>
+                              </View>
+                            </View>
                           </View>
-                          <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>STATUS</Text>
-                            <Text
-                              style={[
-                                styles.fieldVal,
-                                { color: item.leaseStatus === 'Active' ? '#10b981' : '#f59e0b', fontWeight: '800' },
-                              ]}
-                              allowFontScaling={false}
-                            >
-                              {item.leaseStatus || item.unitStatus}
-                            </Text>
-                          </View>
+
+                          {(item.startDate || item.endDate) && (
+                            <View style={[styles.cardDetailRow, { marginTop: 8 }]}>
+                              <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel} allowFontScaling={false}>TERM DATES</Text>
+                                <Text style={[styles.detailValue, { fontSize: 11, color: colors.textSecondary }]} allowFontScaling={false}>
+                                  {item.startDate && item.startDate !== 'N/A' ? new Date(item.startDate).toLocaleDateString() : 'N/A'}
+                                  {'  →  '}
+                                  {item.endDate && item.endDate !== 'N/A' ? new Date(item.endDate).toLocaleDateString() : 'N/A'}
+                                </Text>
+                              </View>
+                            </View>
+                          )}
                         </View>
                       )}
 
+                      {/* --- OCCUPANCY FIELDS --- */}
                       {selectedReportId === 'occupancy' && (
                         <View>
                           <View style={styles.rowBetween}>
                             <Text style={styles.recordSubText} allowFontScaling={false}>Occupancy Rate</Text>
-                            <Text style={[styles.fieldVal, { color: '#10b981', fontWeight: '800' }]} allowFontScaling={false}>
+                            <Text style={[styles.detailValue, { color: '#10b981', fontWeight: '900' }]} allowFontScaling={false}>
                               {item.occupancyPercentage}%
                             </Text>
                           </View>
@@ -825,18 +1270,18 @@ export const ReportsScreen = () => {
                           </View>
                           <View style={styles.fieldsGrid}>
                             <View style={styles.fieldItem}>
-                              <Text style={styles.fieldLabel} allowFontScaling={false}>TOTAL</Text>
-                              <Text style={styles.fieldVal} allowFontScaling={false}>{item.totalUnits} Units</Text>
+                              <Text style={styles.detailLabel} allowFontScaling={false}>TOTAL</Text>
+                              <Text style={styles.detailValue} allowFontScaling={false}>{item.totalUnits} Units</Text>
                             </View>
                             <View style={styles.fieldItem}>
-                              <Text style={styles.fieldLabel} allowFontScaling={false}>OCCUPIED</Text>
-                              <Text style={[styles.fieldVal, { color: '#10b981' }]} allowFontScaling={false}>
+                              <Text style={styles.detailLabel} allowFontScaling={false}>OCCUPIED</Text>
+                              <Text style={[styles.detailValue, { color: '#10b981' }]} allowFontScaling={false}>
                                 {item.occupiedUnits} Units
                               </Text>
                             </View>
                             <View style={styles.fieldItem}>
-                              <Text style={styles.fieldLabel} allowFontScaling={false}>VACANT</Text>
-                              <Text style={[styles.fieldVal, { color: '#f59e0b' }]} allowFontScaling={false}>
+                              <Text style={styles.detailLabel} allowFontScaling={false}>VACANT</Text>
+                              <Text style={[styles.detailValue, { color: '#f59e0b' }]} allowFontScaling={false}>
                                 {item.vacantUnits} Units
                               </Text>
                             </View>
@@ -844,34 +1289,36 @@ export const ReportsScreen = () => {
                         </View>
                       )}
 
+                      {/* --- DELINQUENCY FIELDS --- */}
                       {selectedReportId === 'delinquency' && (
                         <View style={styles.fieldsGrid}>
                           <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>DUE DATE</Text>
-                            <Text style={styles.fieldVal} allowFontScaling={false}>{item.dueDate || 'N/A'}</Text>
+                            <Text style={styles.detailLabel} allowFontScaling={false}>TENANT</Text>
+                            <Text style={styles.detailValue} numberOfLines={1} allowFontScaling={false}>{item.tenantName || 'N/A'}</Text>
                           </View>
                           <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>OVERDUE DAYS</Text>
-                            <Text style={[styles.fieldVal, { color: '#ef4444', fontWeight: '800' }]} allowFontScaling={false}>
+                            <Text style={styles.detailLabel} allowFontScaling={false}>DAYS LATE</Text>
+                            <Text style={[styles.detailValue, { color: '#ef4444', fontWeight: '900' }]} allowFontScaling={false}>
                               {item.daysLate} Days
                             </Text>
                           </View>
                           <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>BALANCE</Text>
-                            <Text style={[styles.fieldVal, { color: '#ef4444', fontWeight: '800' }]} allowFontScaling={false}>
+                            <Text style={styles.detailLabel} allowFontScaling={false}>BALANCE</Text>
+                            <Text style={[styles.detailValue, { color: '#ef4444', fontWeight: '900' }]} allowFontScaling={false}>
                               ${Number(item.outstandingBalance || 0).toLocaleString()}
                             </Text>
                           </View>
                         </View>
                       )}
 
+                      {/* --- PROFIT & LOSS FIELDS --- */}
                       {selectedReportId === 'profit-loss' && (
                         <View style={styles.rowBetween}>
                           <Text style={styles.recordSubText} allowFontScaling={false}>Category: {item.type}</Text>
                           <Text
                             style={[
-                              styles.fieldVal,
-                              { color: item.type === 'Income' ? '#10b981' : '#ef4444', fontWeight: '800' },
+                              styles.detailValue,
+                              { color: item.type === 'Income' ? '#10b981' : '#ef4444', fontWeight: '900' },
                             ]}
                             allowFontScaling={false}
                           >
@@ -880,40 +1327,42 @@ export const ReportsScreen = () => {
                         </View>
                       )}
 
+                      {/* --- MAINTENANCE FIELDS --- */}
                       {selectedReportId === 'maintenance' && (
                         <View style={styles.fieldsGrid}>
                           <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>ISSUE</Text>
-                            <Text style={styles.fieldVal} numberOfLines={1} allowFontScaling={false}>{item.issue || 'Service'}</Text>
+                            <Text style={styles.detailLabel} allowFontScaling={false}>ISSUE</Text>
+                            <Text style={styles.detailValue} numberOfLines={1} allowFontScaling={false}>{item.issue || 'Service'}</Text>
                           </View>
                           <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>PRIORITY</Text>
-                            <Text style={[styles.fieldVal, { color: item.priority === 'High' ? '#ef4444' : '#38bdf8' }]} allowFontScaling={false}>
+                            <Text style={styles.detailLabel} allowFontScaling={false}>PRIORITY</Text>
+                            <Text style={[styles.detailValue, { color: item.priority === 'High' ? '#ef4444' : '#38bdf8' }]} allowFontScaling={false}>
                               {item.priority || 'Normal'}
                             </Text>
                           </View>
                           <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>ACTUAL COST</Text>
-                            <Text style={[styles.fieldVal, { color: '#10b981', fontWeight: '800' }]} allowFontScaling={false}>
+                            <Text style={styles.detailLabel} allowFontScaling={false}>ACTUAL COST</Text>
+                            <Text style={[styles.detailValue, { color: '#10b981', fontWeight: '900' }]} allowFontScaling={false}>
                               ${Number(item.actualCost || 0).toLocaleString()}
                             </Text>
                           </View>
                         </View>
                       )}
 
+                      {/* --- PAYMENT HISTORY FIELDS --- */}
                       {selectedReportId === 'payment-history' && (
                         <View style={styles.fieldsGrid}>
                           <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>DATE</Text>
-                            <Text style={styles.fieldVal} allowFontScaling={false}>{item.paymentDate || 'N/A'}</Text>
+                            <Text style={styles.detailLabel} allowFontScaling={false}>DATE</Text>
+                            <Text style={styles.detailValue} allowFontScaling={false}>{item.paymentDate || 'N/A'}</Text>
                           </View>
                           <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>METHOD</Text>
-                            <Text style={styles.fieldVal} allowFontScaling={false}>{item.paymentMethod || 'ACH'}</Text>
+                            <Text style={styles.detailLabel} allowFontScaling={false}>METHOD</Text>
+                            <Text style={styles.detailValue} allowFontScaling={false}>{item.paymentMethod || 'ACH'}</Text>
                           </View>
                           <View style={styles.fieldItem}>
-                            <Text style={styles.fieldLabel} allowFontScaling={false}>AMOUNT</Text>
-                            <Text style={[styles.fieldVal, { color: '#10b981', fontWeight: '800' }]} allowFontScaling={false}>
+                            <Text style={styles.detailLabel} allowFontScaling={false}>AMOUNT</Text>
+                            <Text style={[styles.detailValue, { color: '#10b981', fontWeight: '900' }]} allowFontScaling={false}>
                               +${Number(item.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </Text>
                           </View>
@@ -922,13 +1371,13 @@ export const ReportsScreen = () => {
                     </View>
                   ))
                 )}
-              </Animated.View>
+              </View>
             )}
           </ScrollView>
         </>
       )}
 
-      {/* DETAIL VIEW MODAL (MATCHING WEB ReportDetailsModal.tsx) */}
+      {/* DETAIL VIEW MODAL */}
       <Modal visible={viewingItem !== null} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.detailModalCard}>
@@ -950,9 +1399,14 @@ export const ReportsScreen = () => {
                     const formattedLabel = key.replace(/([A-Z])/g, ' $1').trim().toUpperCase();
                     let displayVal = val;
                     if (typeof val === 'number') {
-                      displayVal = key.toLowerCase().includes('amount') || key.toLowerCase().includes('rent') || key.toLowerCase().includes('cost') || key.toLowerCase().includes('balance') || key.toLowerCase().includes('deposit')
-                        ? `$${val.toLocaleString()}`
-                        : val.toString();
+                      displayVal =
+                        key.toLowerCase().includes('amount') ||
+                        key.toLowerCase().includes('rent') ||
+                        key.toLowerCase().includes('cost') ||
+                        key.toLowerCase().includes('balance') ||
+                        key.toLowerCase().includes('deposit')
+                          ? `$${val.toLocaleString()}`
+                          : val.toString();
                     } else if (typeof val === 'object') {
                       displayVal = JSON.stringify(val);
                     } else {
@@ -978,7 +1432,7 @@ export const ReportsScreen = () => {
         </View>
       </Modal>
 
-      {/* FILTER MODAL (ACCORDION / INLINE STYLE TO PREVENT MODAL CONFLICTS) */}
+      {/* FILTER MODAL */}
       <Modal visible={filterModalOpen} animationType="slide" transparent>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1226,104 +1680,6 @@ export const ReportsScreen = () => {
                     ))}
                   </View>
                 )}
-
-                {/* 5. Payment Method (for payment-history) */}
-                {selectedReportId === 'payment-history' && (
-                  <>
-                    <Text style={styles.filterLabel} allowFontScaling={false}>PAYMENT METHOD</Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.accordionHeader,
-                        expandedFilterSection === 'method' && styles.accordionHeaderActive,
-                      ]}
-                      onPress={() =>
-                        setExpandedFilterSection(expandedFilterSection === 'method' ? null : 'method')
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.accordionHeaderText} allowFontScaling={false}>
-                        {selectedPaymentMethod || 'All Methods'}
-                      </Text>
-                      <Ionicons
-                        name={expandedFilterSection === 'method' ? 'chevron-up' : 'chevron-down'}
-                        size={16}
-                        color="#94a3b8"
-                      />
-                    </TouchableOpacity>
-                    {expandedFilterSection === 'method' && (
-                      <View style={styles.accordionList}>
-                        {['', 'ACH', 'Cash', 'Check', 'CreditCard', 'Zelle'].map((m) => (
-                          <TouchableOpacity
-                            key={m || 'all'}
-                            style={styles.accordionOption}
-                            onPress={() => {
-                              setSelectedPaymentMethod(m);
-                              setExpandedFilterSection(null);
-                            }}
-                          >
-                            <Ionicons
-                              name={selectedPaymentMethod === m ? 'radio-button-on' : 'radio-button-off'}
-                              size={16}
-                              color={selectedPaymentMethod === m ? '#38bdf8' : '#64748b'}
-                            />
-                            <Text style={[styles.accordionOptionText, selectedPaymentMethod === m && styles.optionSelectedText]}>
-                              {m || 'All Methods'}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </>
-                )}
-
-                {/* 6. Priority (for maintenance) */}
-                {selectedReportId === 'maintenance' && (
-                  <>
-                    <Text style={styles.filterLabel} allowFontScaling={false}>PRIORITY</Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.accordionHeader,
-                        expandedFilterSection === 'priority' && styles.accordionHeaderActive,
-                      ]}
-                      onPress={() =>
-                        setExpandedFilterSection(expandedFilterSection === 'priority' ? null : 'priority')
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.accordionHeaderText} allowFontScaling={false}>
-                        {selectedPriority || 'All Priorities'}
-                      </Text>
-                      <Ionicons
-                        name={expandedFilterSection === 'priority' ? 'chevron-up' : 'chevron-down'}
-                        size={16}
-                        color="#94a3b8"
-                      />
-                    </TouchableOpacity>
-                    {expandedFilterSection === 'priority' && (
-                      <View style={styles.accordionList}>
-                        {['', 'Low', 'Medium', 'High', 'Emergency'].map((pr) => (
-                          <TouchableOpacity
-                            key={pr || 'all'}
-                            style={styles.accordionOption}
-                            onPress={() => {
-                              setSelectedPriority(pr);
-                              setExpandedFilterSection(null);
-                            }}
-                          >
-                            <Ionicons
-                              name={selectedPriority === pr ? 'radio-button-on' : 'radio-button-off'}
-                              size={16}
-                              color={selectedPriority === pr ? '#38bdf8' : '#64748b'}
-                            />
-                            <Text style={[styles.accordionOptionText, selectedPriority === pr && styles.optionSelectedText]}>
-                              {pr || 'All Priorities'}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </>
-                )}
               </ScrollView>
 
               {/* Action Buttons inside Filter Modal */}
@@ -1356,20 +1712,28 @@ const getStyles = (colors, isDarkMode) =>
   StyleSheet.create({
     mainWrapper: { flex: 1, backgroundColor: colors.background },
     container: { flex: 1 },
-    scrollContent: { paddingHorizontal: 16, paddingBottom: 60 },
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 60,
+      width: '100%',
+      maxWidth: 1024,
+      alignSelf: 'center',
+    },
     fixedHeader: {
       paddingHorizontal: 16,
-      paddingBottom: 10,
+      paddingBottom: 12,
       borderBottomWidth: 1,
       borderBottomColor: colors.cardBorder,
+      backgroundColor: colors.background,
+      width: '100%',
+      maxWidth: 1024,
+      alignSelf: 'center',
     },
-    title: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
-    subtitle: { fontSize: 11.5, color: colors.textSecondary, marginTop: 3, lineHeight: 16 },
+    title: { fontSize: 22, fontWeight: '900', color: colors.textPrimary },
+    subtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 4, lineHeight: 16 },
 
     // Main Reports Directory
     repCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
       backgroundColor: colors.surface,
       borderRadius: 16,
       padding: 16,
@@ -1382,22 +1746,112 @@ const getStyles = (colors, isDarkMode) =>
       shadowRadius: 3,
       elevation: 2,
     },
+    repCardHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
     cardIconBox: {
-      width: 48,
-      height: 48,
+      width: 46,
+      height: 46,
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 14,
+      borderWidth: 1,
     },
     cardInfo: { flex: 1 },
-    cardTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
-    cardDesc: { fontSize: 11.5, color: colors.textSecondary, marginTop: 3, lineHeight: 16 },
+    cardTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+    cardDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 4, lineHeight: 17 },
+
+    generateReportRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 14,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+    },
+    generateReportText: {
+      color: '#38bdf8',
+      fontSize: 12.5,
+      fontWeight: '800',
+    },
+
+    auditCenterCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginTop: 4,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    auditCenterHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+      paddingBottom: 8,
+      marginBottom: 8,
+    },
+    auditCenterTitle: {
+      fontSize: 13.5,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
+    auditCenterDesc: {
+      fontSize: 11.5,
+      color: colors.textSecondary,
+      lineHeight: 16,
+    },
 
     // Viewer Header
-    backBtn: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-    backBtnText: { color: '#38bdf8', fontSize: 12.5, fontWeight: '700' },
+    backBtn: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+    backBtnText: { color: '#38bdf8', fontSize: 13, fontWeight: '800' },
     headerTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+    // Export Options Bar
+    exportBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    exportLabel: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    exportButtonsRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    exportBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.inputBackground,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+    },
+    exportBtnText: {
+      fontSize: 11.5,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
 
     // Search, Reload and Filters bar
     searchBarRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
@@ -1439,61 +1893,77 @@ const getStyles = (colors, isDarkMode) =>
       borderColor: '#0284c7',
     },
     filterBtnText: { color: colors.textPrimary, fontSize: 12, fontWeight: '800' },
-    clearFilterBtn: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    unfilterBtn: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      height: 38,
+      borderRadius: 10,
+      backgroundColor: 'rgba(244, 63, 94, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(244, 63, 94, 0.25)',
+    },
+    unfilterText: {
+      color: '#f43f5e',
+      fontSize: 11,
+      fontWeight: '800',
     },
 
     centerLoading: { paddingVertical: 40, alignItems: 'center' },
     loadingText: { color: colors.textSecondary, fontSize: 13, marginTop: 10, fontWeight: '600' },
 
-    // KPI Cards Grid
+    // KPI Cards Grid (Matching Photo 2)
     kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
     kpiCard: {
-      flex: 1,
-      minWidth: '47%',
-      backgroundColor: colors.surface,
-      borderRadius: 12,
+      width: '48.5%',
+      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+      borderRadius: 14,
       padding: 12,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
-      borderLeftWidth: 4,
+      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
-    kpiLabel: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
-    kpiValue: { fontSize: 16, fontWeight: '900', marginTop: 4 },
+    kpiTextCol: { flex: 1, marginRight: 6 },
+    kpiLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.5 },
+    kpiValue: { fontSize: 16, fontWeight: '900', marginTop: 4, color: isDarkMode ? '#ffffff' : '#0f172a' },
+    kpiIconBox: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
     // P&L Summary Cards
     pnLSummaryRow: { flexDirection: 'row', gap: 6, marginBottom: 14 },
     pnLSummaryBox: {
       flex: 1,
-      backgroundColor: colors.surface,
+      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
       borderRadius: 12,
       padding: 10,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
-      borderLeftWidth: 4,
+      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
     },
-    pnLSummaryLabel: { fontSize: 8.5, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
-    pnLSummaryVal: { fontSize: 12.5, fontWeight: '900', marginTop: 4 },
+    pnLSummaryLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.5 },
+    pnLSummaryVal: { fontSize: 13, fontWeight: '900', marginTop: 4, color: isDarkMode ? '#ffffff' : '#0f172a' },
 
     sectionHeaderRow: { marginBottom: 10 },
-    reportSectionHeader: { fontSize: 11, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.8 },
+    reportSectionHeader: { fontSize: 11, fontWeight: '800', color: isDarkMode ? '#94a3b8' : colors.textMuted, letterSpacing: 0.8 },
 
     emptyView: {
-      backgroundColor: colors.surface,
+      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
       borderRadius: 16,
       padding: 30,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
       marginTop: 10,
     },
-    emptyText: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-    emptySubText: { color: colors.textMuted, fontSize: 11.5, marginTop: 4, textAlign: 'center' },
+    emptyText: { color: isDarkMode ? '#ffffff' : colors.textPrimary, fontSize: 14, fontWeight: '700' },
+    emptySubText: { color: isDarkMode ? '#94a3b8' : colors.textMuted, fontSize: 11.5, marginTop: 4, textAlign: 'center' },
     emptyResetBtn: {
       marginTop: 14,
       backgroundColor: '#38bdf8',
@@ -1503,18 +1973,18 @@ const getStyles = (colors, isDarkMode) =>
     },
     emptyResetBtnText: { color: '#0f172a', fontWeight: '800', fontSize: 12 },
 
-    // Report Card
+    // Report Card (Matching Photo 2 rows)
     reportCard: {
-      backgroundColor: colors.surface,
+      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
       borderRadius: 14,
       padding: 14,
       marginBottom: 10,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
     },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    recordLabel: { fontSize: 14.5, fontWeight: '800', color: colors.textPrimary },
-    recordSubText: { fontSize: 11.5, color: colors.textSecondary, marginTop: 2 },
+    recordLabel: { fontSize: 15, fontWeight: '800', color: isDarkMode ? '#ffffff' : colors.textPrimary },
+    recordSubText: { fontSize: 12, color: isDarkMode ? '#94a3b8' : colors.textSecondary, marginTop: 2, fontWeight: '600' },
     eyeBtn: {
       width: 32,
       height: 32,
@@ -1523,11 +1993,74 @@ const getStyles = (colors, isDarkMode) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    cardDivider: { height: 1, backgroundColor: colors.divider, marginVertical: 10 },
+    cardDivider: { height: 1, backgroundColor: isDarkMode ? '#334155' : colors.divider, marginVertical: 10 },
+    cardDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    detailItem: { alignItems: 'flex-start' },
+    detailLabel: { fontSize: 9.5, fontWeight: '800', color: isDarkMode ? '#94a3b8' : colors.textMuted, letterSpacing: 0.5, marginBottom: 2 },
+    detailValue: { fontSize: 13, color: isDarkMode ? '#f8fafc' : colors.textPrimary, fontWeight: '700' },
+
+    // Badges
+    statusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 2.5,
+      borderRadius: 6,
+      borderWidth: 1,
+    },
+    statusActive: {
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+    },
+    statusTextActive: {
+      color: '#10b981',
+      fontSize: 10,
+      fontWeight: '800',
+    },
+    statusPending: {
+      backgroundColor: 'rgba(251, 191, 36, 0.12)',
+      borderColor: 'rgba(251, 191, 36, 0.3)',
+    },
+    statusTextPending: {
+      color: '#fbbf24',
+      fontSize: 10,
+      fontWeight: '800',
+    },
+    statusTerminated: {
+      backgroundColor: 'rgba(244, 63, 94, 0.12)',
+      borderColor: 'rgba(244, 63, 94, 0.3)',
+    },
+    statusTextTerminated: {
+      color: '#f43f5e',
+      fontSize: 10,
+      fontWeight: '800',
+    },
+
+    unitStatusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 2.5,
+      borderRadius: 6,
+      borderWidth: 1,
+    },
+    unitOccupied: {
+      backgroundColor: 'rgba(99, 102, 241, 0.12)',
+      borderColor: 'rgba(99, 102, 241, 0.3)',
+    },
+    unitTextOccupied: {
+      color: '#818cf8',
+      fontSize: 10,
+      fontWeight: '800',
+    },
+    unitVacant: {
+      backgroundColor: 'rgba(148, 163, 184, 0.12)',
+      borderColor: 'rgba(148, 163, 184, 0.3)',
+    },
+    unitTextVacant: {
+      color: '#94a3b8',
+      fontSize: 10,
+      fontWeight: '800',
+    },
+
     fieldsGrid: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
     fieldItem: { flex: 1 },
-    fieldLabel: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
-    fieldVal: { fontSize: 12.5, color: colors.textPrimary, fontWeight: '700', marginTop: 2 },
 
     // Occupancy Progress
     progressBarBg: { height: 6, backgroundColor: colors.inputBackground, borderRadius: 3, marginVertical: 8, overflow: 'hidden' },
@@ -1551,7 +2084,7 @@ const getStyles = (colors, isDarkMode) =>
       borderColor: colors.cardBorder,
     },
     detailItemRow: {
-      marginBottom: 10,
+      marginBottom: 8,
       backgroundColor: colors.inputBackground,
       borderRadius: 8,
       padding: 10,

@@ -629,7 +629,7 @@ export const TenantDashboard = ({ onNavigate }) => {
 
 const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { padding: 16 },
+  scrollContent: { padding: 16, width: '100%', maxWidth: 1024, alignSelf: 'center' },
   alertCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -717,7 +717,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   reviewBtnText: { color: '#0f172a', fontSize: 11, fontWeight: '800' },
 
   modalBg: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.85)', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 22, borderWidth: 1, borderColor: colors.cardBorder },
+  modalCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 22, borderWidth: 1, borderColor: colors.cardBorder, width: '100%', maxWidth: 540, alignSelf: 'center' },
   modalIconCenter: { alignItems: 'center', marginBottom: 12 },
   modalTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: 12, textAlign: 'center' },
   confirmText: { color: colors.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 18 },

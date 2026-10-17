@@ -617,7 +617,7 @@ export const AdminDashboard = ({ onNavigate }) => {
 
 const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { padding: 16, paddingBottom: 60 },
+  scrollContent: { padding: 16, paddingBottom: 60, width: '100%', maxWidth: 1024, alignSelf: 'center' },
   center: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: colors.textSecondary, marginTop: 8 },
 
@@ -735,7 +735,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
 
   // Modals
   modalBg: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 20, width: '100%', maxHeight: '85%', borderWidth: 1, borderColor: colors.cardBorder },
+  modalCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 20, width: '100%', maxWidth: 580, alignSelf: 'center', maxHeight: '85%', borderWidth: 1, borderColor: colors.cardBorder },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   modalTitle: { fontSize: 16.5, fontWeight: '800', color: colors.textPrimary },
   modalSubtitle: { fontSize: 12, color: colors.textSecondary, marginBottom: 14 },
@@ -751,7 +751,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   submitBtnText: { color: '#0f172a', fontWeight: '850', fontSize: 12.5 },
 
   // Picker Dropdown Modal Options
-  pickerModalContent: { backgroundColor: colors.surface, borderRadius: 16, width: '80%', padding: 16, borderWidth: 1, borderColor: colors.cardBorder },
+  pickerModalContent: { backgroundColor: colors.surface, borderRadius: 16, width: '90%', maxWidth: 440, alignSelf: 'center', padding: 16, borderWidth: 1, borderColor: colors.cardBorder },
   pickerModalTitle: { fontSize: 14.5, fontWeight: '800', color: colors.textPrimary, marginBottom: 12, textAlign: 'center' },
   pickerOptionRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider },
   pickerOptionText: { color: colors.textSecondary, fontSize: 13.5, fontWeight: '700' },

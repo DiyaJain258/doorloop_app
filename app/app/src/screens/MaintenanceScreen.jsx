@@ -3246,7 +3246,7 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
 const getStyles = (colors, isDarkMode) => StyleSheet.create({
   mainWrapper: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 110 },
+  scrollContent: { padding: 16, paddingBottom: 110, width: '100%', maxWidth: 1024, alignSelf: 'center' },
   center: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: colors.textSecondary, marginTop: 8 },
 
@@ -3634,6 +3634,8 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalCard: {
     width: '90%',
+    maxWidth: 580,
+    alignSelf: 'center',
     backgroundColor: colors.cardBg,
     borderRadius: 20,
     padding: 20,
@@ -3737,7 +3739,9 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   pickerModalContent: {
     backgroundColor: colors.surface,
     borderRadius: 16,
-    width: '80%',
+    width: '90%',
+    maxWidth: 440,
+    alignSelf: 'center',
     padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,

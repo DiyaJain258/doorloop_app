@@ -2089,7 +2089,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   errorLabel: { color: '#ef4444', fontSize: 10.5, marginTop: 4, fontWeight: '700' },
   mainWrapper: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 60 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 60, width: '100%', maxWidth: 1024, alignSelf: 'center' },
 
   fixedHeader: {
     backgroundColor: colors.background,
@@ -2098,6 +2098,9 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.cardBorder,
     zIndex: 10,
+    width: '100%',
+    maxWidth: 1024,
+    alignSelf: 'center',
   },
   headerTextContainer: {
     minHeight: 85,
@@ -2230,10 +2233,12 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 20,
     width: '100%',
+    maxWidth: 580,
     maxHeight: '85%',
     padding: 20,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+    alignSelf: 'center',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -2300,10 +2305,12 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   pickerModalContent: {
     backgroundColor: colors.surface,
     borderRadius: 16,
-    width: '80%',
+    width: '90%',
+    maxWidth: 440,
     padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+    alignSelf: 'center',
   },
   pickerModalTitle: { fontSize: 14.5, fontWeight: '800', color: colors.textPrimary, marginBottom: 12, textAlign: 'center' },
   pickerOptionRow: {

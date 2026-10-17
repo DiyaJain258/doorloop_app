@@ -1,4 +1,12 @@
+import React from 'react';
 import { registerRootComponent } from 'expo';
 import App from './src/App';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
-registerRootComponent(App);
+const RootApp = () => (
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
+
+registerRootComponent(RootApp);

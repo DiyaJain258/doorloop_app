@@ -87,17 +87,8 @@ export const GlobalHeader = ({ onNavigate, onOpenDrawer }) => {
 
   return (
     <View style={styles.headerContainer}>
-      {/* Left: Navigation Drawer Toggle & Brand Identity */}
+      {/* Left: Brand Identity */}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <TouchableOpacity
-          style={styles.menuBtn}
-          onPress={onOpenDrawer}
-          activeOpacity={0.7}
-          accessibilityLabel="Open Navigation Menu"
-        >
-          <Ionicons name="menu" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.brandContainer}
           onPress={() => onNavigate && onNavigate('dashboard')}
@@ -316,7 +307,7 @@ const getStyles = (colors, isDarkMode) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       height: 48,
-      paddingHorizontal: 16,
+      paddingHorizontal: 12,
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: isDarkMode ? '#1e293b' : '#e2e8f0',

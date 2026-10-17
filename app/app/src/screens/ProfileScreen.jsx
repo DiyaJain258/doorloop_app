@@ -1880,7 +1880,7 @@ const getStyles = (colors) => StyleSheet.create({
   errorLabel: { color: '#ef4444', fontSize: 10.5, marginTop: 4, fontWeight: '700' },
   mainWrapper: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1, backgroundColor: colors.bg },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 60, paddingTop: 12 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 60, paddingTop: 12, width: '100%', maxWidth: 1024, alignSelf: 'center' },
 
   fixedHeader: {
     backgroundColor: colors.bg,
@@ -1890,6 +1890,9 @@ const getStyles = (colors) => StyleSheet.create({
     borderBottomColor: colors.cardBorder,
     zIndex: 10,
     paddingTop: 16,
+    width: '100%',
+    maxWidth: 1024,
+    alignSelf: 'center',
   },
   title: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
   subtitle: { fontSize: 11.5, color: colors.textSecondary, marginTop: 4, lineHeight: 15 },
@@ -2077,6 +2080,8 @@ const getStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.cardBg,
     borderRadius: 20,
     width: '100%',
+    maxWidth: 580,
+    alignSelf: 'center',
     maxHeight: '85%',
     padding: 20,
     borderWidth: 1,
@@ -2142,7 +2147,9 @@ const getStyles = (colors) => StyleSheet.create({
   pickerModalContent: {
     backgroundColor: colors.cardBg,
     borderRadius: 16,
-    width: '80%',
+    width: '90%',
+    maxWidth: 440,
+    alignSelf: 'center',
     padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
