@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppRegistry } from 'react-native';
 import { registerRootComponent } from 'expo';
 import App from './src/App';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -10,3 +11,5 @@ const RootApp = () => (
 );
 
 registerRootComponent(RootApp);
+AppRegistry.registerComponent('main', () => RootApp);
+

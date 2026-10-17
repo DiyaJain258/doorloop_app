@@ -16,7 +16,7 @@ class MainActivity : ReactActivity() {
     // coloring the background, status bar, and navigation bar.
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
-    super.onCreate(null)
+    super.onCreate(savedInstanceState)
   }
 
   /**
@@ -32,6 +32,7 @@ class MainActivity : ReactActivity() {
   override fun createReactActivityDelegate(): ReactActivityDelegate {
     return ReactActivityDelegateWrapper(
           this,
+          BuildConfig.IS_NEW_ARCHITECTURE_ENABLED,
           object : DefaultReactActivityDelegate(
               this,
               mainComponentName,

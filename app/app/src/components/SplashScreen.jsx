@@ -28,8 +28,14 @@ export const SplashScreen = ({ onFinish }) => {
           duration: 500,
           useNativeDriver: true,
         }).start(onFinish);
-      }, 1100);
+      }, 900);
     });
+
+    const fallback = setTimeout(() => {
+      onFinish && onFinish();
+    }, 2200);
+
+    return () => clearTimeout(fallback);
   }, []);
 
   return (
