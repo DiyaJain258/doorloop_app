@@ -9,15 +9,23 @@ export const SplashScreen = ({ onFinish }) => {
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
+    let finished = false;
+    const safeFinish = () => {
+      if (!finished) {
+        finished = true;
+        onFinish && onFinish();
+      }
+    };
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 900,
+        duration: 800,
         useNativeDriver: true,
       }),
       Animated.timing(scaleAnim, {
         toValue: 1,
-        duration: 900,
+        duration: 800,
         easing: Easing.out(Easing.back(1.5)),
         useNativeDriver: true,
       }),
@@ -25,17 +33,20 @@ export const SplashScreen = ({ onFinish }) => {
       setTimeout(() => {
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 500,
+          duration: 400,
           useNativeDriver: true,
-        }).start(onFinish);
-      }, 900);
+        }).start(safeFinish);
+      }, 700);
     });
 
     const fallback = setTimeout(() => {
-      onFinish && onFinish();
-    }, 2200);
+      safeFinish();
+    }, 2000);
 
-    return () => clearTimeout(fallback);
+    return () => {
+      finished = true;
+      clearTimeout(fallback);
+    };
   }, []);
 
   return (

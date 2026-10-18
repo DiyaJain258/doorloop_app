@@ -11,5 +11,4 @@ const RootApp = () => (
 );
 
 registerRootComponent(RootApp);
-AppRegistry.registerComponent('main', () => RootApp);
 
