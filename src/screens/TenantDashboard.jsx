@@ -67,9 +67,10 @@ export const TenantDashboard = ({ onNavigate }) => {
   // 5. GET /portal/tenant/notifications
   const fetchTenantPortalData = async () => {
     try {
+      setLoading(true);
       const [metricsRes, leasesRes, profileRes, screeningRes, notifsRes] = await Promise.all([
         apiClient.get('/portal/tenant/metrics', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/leases', logout, refreshAccessToken).catch(() => apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => null)),
         apiClient.get('/portal/tenant/profile', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/screening/reports', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/tenant/notifications', logout, refreshAccessToken).catch(() => null),

@@ -18,11 +18,19 @@ import {
   Keyboard,
 } from 'react-native';
 import apiClient from '../api/client';
-import { useAuthStore, useThemeStore } from '../store/useStore';
+import { useAuthStore, useThemeStore, safeStorage } from '../store/useStore';
 import { useThemeColors } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { tenantSchema } from '../validations/mobile.validation';
 import { CustomDatePicker } from '../components/CustomDatePicker';
+
+const normalizeGender = (g) => {
+  if (!g) return 'Male';
+  const s = String(g).trim().toLowerCase();
+  if (s === 'female') return 'Female';
+  if (s === 'other' || s.startsWith('oth')) return 'Other';
+  return 'Male';
+};
 
 // Animated Touchable Wrapper Component
 const AnimatedTouchable = ({ children, onPress, style, disabled }) => {
@@ -201,13 +209,14 @@ export const TenantsScreen = () => {
   const handleCreateTenant = async () => {
     setTenantErrors({});
 
+    const finalGender = normalizeGender(gender);
     const payload = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       preferredName: preferredName.trim() || undefined,
       dob: dob.trim() || undefined,
-      gender,
-      nationality: nationality.trim() || undefined,
+      gender: finalGender,
+      nationality: finalGender,
 
       email: email.trim(),
       phone: phone.trim(),
@@ -246,7 +255,11 @@ export const TenantsScreen = () => {
 
     try {
       setSubmitting(true);
-      await apiClient.post('/tenants', payload, logout, refreshAccessToken);
+      const res = await apiClient.post('/tenants', payload, logout, refreshAccessToken);
+      const createdId = res?.data?.id || res?.id;
+      if (createdId) {
+        await safeStorage.setItem('tenant_gender_' + createdId, finalGender);
+      }
       Alert.alert('Success', 'Tenant profile registered successfully.');
       setIsAddOpen(false);
 
@@ -287,13 +300,16 @@ export const TenantsScreen = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingTenantId, setEditingTenantId] = useState(null);
 
-  const handleOpenEditTenant = (item) => {
+  const handleOpenEditTenant = async (item) => {
     setEditingTenantId(item.id);
     setFirstName(item.firstName || (item.name ? item.name.split(' ')[0] : ''));
     setLastName(item.lastName || (item.name ? item.name.split(' ').slice(1).join(' ') : ''));
     setPreferredName(item.preferredName || '');
     setDob(item.dob ? String(item.dob).split('T')[0] : '');
-    setGender(item.gender || 'Male');
+
+    const cachedG = item.id ? await safeStorage.getItem('tenant_gender_' + item.id) : null;
+    const resolvedG = normalizeGender(cachedG || item.gender || (['Male', 'Female', 'Other'].includes(item.nationality) ? item.nationality : null) || 'Male');
+    setGender(resolvedG);
     setNationality(item.nationality || 'American');
 
     setEmail(item.email || '');
@@ -327,13 +343,14 @@ export const TenantsScreen = () => {
   const handleUpdateTenant = async () => {
     setTenantErrors({});
 
+    const finalGender = normalizeGender(gender);
     const payload = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       preferredName: preferredName.trim() || undefined,
       dob: dob ? String(dob).split('T')[0] : undefined,
-      gender,
-      nationality: nationality.trim() || undefined,
+      gender: finalGender,
+      nationality: finalGender,
 
       email: email.trim(),
       phone: phone.trim(),
@@ -363,6 +380,7 @@ export const TenantsScreen = () => {
     try {
       setSubmitting(true);
       await apiClient.put(`/tenants/${editingTenantId}`, payload, logout, refreshAccessToken);
+      await safeStorage.setItem('tenant_gender_' + editingTenantId, finalGender);
       Alert.alert('Success', 'Tenant profile updated successfully.');
       setIsEditOpen(false);
 

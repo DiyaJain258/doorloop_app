@@ -28,7 +28,9 @@ export const GlobalHeader = ({ onNavigate }) => {
     const fetchNotifications = async () => {
       try {
         const query = user?.role === 'Tenant' ? '?role=Tenant' : '';
-        const res = await apiClient.get(`/notifications${query}`, logout, refreshAccessToken).catch(() => null);
+        const res = await apiClient
+          .get(`/notifications${query}`, logout, refreshAccessToken)
+          .catch(() => apiClient.get('/portal/notifications', logout, refreshAccessToken).catch(() => null));
         const data = res?.data || res || [];
         if (Array.isArray(data) && isMounted) {
           const unread = data.filter((n) => !n.read && !n.isRead).length;
