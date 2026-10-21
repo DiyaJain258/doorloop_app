@@ -15,8 +15,49 @@ export const CustomDatePicker = ({ visible, value, onSelect, onClose }) => {
   const { colors } = useThemeColors();
   const styles = getStyles(colors);
 
+  const parseDateToParts = (val) => {
+    if (!val) return new Date();
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (trimmed.includes('-')) {
+        const p = trimmed.split('-');
+        if (p.length === 3) {
+          if (p[0].length === 4) {
+            const y = parseInt(p[0], 10);
+            const m = parseInt(p[1], 10) - 1;
+            const d = parseInt(p[2], 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return new Date(y, m, d);
+          } else {
+            const m = parseInt(p[0], 10) - 1;
+            const d = parseInt(p[1], 10);
+            const y = parseInt(p[2], 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return new Date(y, m, d);
+          }
+        }
+      }
+      if (trimmed.includes('/')) {
+        const p = trimmed.split('/');
+        if (p.length === 3) {
+          if (p[0].length === 4) {
+            const y = parseInt(p[0], 10);
+            const m = parseInt(p[1], 10) - 1;
+            const d = parseInt(p[2], 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return new Date(y, m, d);
+          } else {
+            const m = parseInt(p[0], 10) - 1;
+            const d = parseInt(p[1], 10);
+            const y = parseInt(p[2], 10);
+            if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return new Date(y, m, d);
+          }
+        }
+      }
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
+
   // Parse initial date
-  const initialDate = value ? new Date(value) : new Date();
+  const initialDate = parseDateToParts(value);
   const [currentYear, setCurrentYear] = useState(initialDate.getFullYear() || new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(
     isNaN(initialDate.getMonth()) ? new Date().getMonth() : initialDate.getMonth()
@@ -26,7 +67,7 @@ export const CustomDatePicker = ({ visible, value, onSelect, onClose }) => {
 
   useEffect(() => {
     if (visible) {
-      const d = value ? new Date(value) : new Date();
+      const d = parseDateToParts(value);
       if (!isNaN(d.getTime())) {
         setCurrentYear(d.getFullYear());
         setCurrentMonth(d.getMonth());
