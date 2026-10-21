@@ -30,8 +30,8 @@ export const TenantDashboard = ({ onNavigate }) => {
   // Live Tenant Data matching Web Frontend /portal/tenant/metrics & /portal/tenant/leases
   const [tenantData, setTenantData] = useState({
     name: user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Resident',
-    propertyName: 'Skyline Luxury Lofts',
-    unitNumber: '304',
+    propertyName: 'No Active Lease',
+    unitNumber: 'N/A',
     currentRent: 0,
     outstandingBalance: 0,
     nextDueDate: 'N/A',
@@ -82,8 +82,8 @@ export const TenantDashboard = ({ onNavigate }) => {
       const notifs = notifsRes?.data || notifsRes || [];
 
       const lease = leases.length > 0 ? leases[0] : null;
-      const propName = lease?.property?.name || lease?.propertyName || profile?.companyName || 'Skyline Luxury Lofts';
-      const unitNum = lease?.unit?.unitNumber || lease?.unitNumber || profile?.unitNumber || '304';
+      const propName = lease?.property?.name || lease?.propertyName || profile?.companyName || (lease ? 'Property' : 'No Active Lease');
+      const unitNum = lease?.unit?.unitNumber || lease?.unitNumber || profile?.unitNumber || (lease ? 'Unit' : 'N/A');
 
       // Match tenant screening report
       const myEmail = user?.email || profile?.email || '';
@@ -102,7 +102,7 @@ export const TenantDashboard = ({ onNavigate }) => {
         setLatestNotice(unread || null);
       }
 
-      const rentAmount = Number(metrics.currentRent || metrics.currentRentDue || lease?.rentAmount || 1250);
+      const rentAmount = Number(metrics.currentRent || metrics.currentRentDue || lease?.rentAmount || 0);
       const outBal = Number(metrics.outstandingBalance ?? 0);
 
       setTenantData({
@@ -114,8 +114,8 @@ export const TenantDashboard = ({ onNavigate }) => {
         unitNumber: unitNum,
         currentRent: rentAmount,
         outstandingBalance: outBal,
-        nextDueDate: metrics.nextDueDate || 'August 1, 2026',
-        leaseExpiration: metrics.leaseExpiration || lease?.endDate?.split('T')[0] || 'April 30, 2027',
+        nextDueDate: metrics.nextDueDate || (lease ? '1st of next month' : 'N/A'),
+        leaseExpiration: metrics.leaseExpiration || (lease?.endDate ? lease.endDate.split('T')[0] : 'N/A'),
         activeVisitors: Number(metrics.activeVisitors || 0),
         packagesWaiting: Number(metrics.packagesWaiting || 0),
       });

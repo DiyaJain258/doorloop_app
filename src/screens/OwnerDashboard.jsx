@@ -26,39 +26,22 @@ export const OwnerDashboard = ({ onNavigate }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [metrics, setMetrics] = useState({
     totalProperties: 0,
+    totalUnits: 0,
     occupancyRate: '0%',
     netIncome: '$0',
     pendingMaintenance: 0,
   });
   const [properties, setProperties] = useState([]);
-
-  // Mock monthly data for the chart: Income vs Expenses
-  const chartData = [
-    { month: 'May', income: 1900, expenses: 600 },
-    { month: 'Jun', income: 2000, expenses: 650 },
-    { month: 'Jul', income: 2200, expenses: 700 },
-    { month: 'Aug', income: 2400, expenses: 750 },
-    { month: 'Sep', income: 2250, expenses: 710 },
-    { month: 'Oct', income: 2300, expenses: 720 },
-  ];
+  const [chartData, setChartData] = useState([]);
 
   const fetchLiveOwnerData = async () => {
     try {
       setLoading(true);
-      const [metricsRes, propsRes] = await Promise.all([
+      const [metricsRes, propsRes, chartsRes] = await Promise.all([
         apiClient.get('/portal/owner/metrics', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/properties', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/dashboard/charts', logout, refreshAccessToken).catch(() => null),
       ]);
-
-      if (metricsRes && metricsRes.data) {
-        const m = metricsRes.data;
-        setMetrics({
-          totalProperties: m.totalProperties !== undefined ? m.totalProperties : 0,
-          occupancyRate: typeof m.occupancyRate === 'number' ? `${m.occupancyRate}%` : (m.occupancyRate || '0%'),
-          netIncome: m.netIncome !== undefined ? `$${Number(m.netIncome).toLocaleString()}` : '$0',
-          pendingMaintenance: m.pendingMaintenance || 0,
-        });
-      }
 
       let pList = [];
       if (propsRes && Array.isArray(propsRes)) {
@@ -67,6 +50,34 @@ export const OwnerDashboard = ({ onNavigate }) => {
         pList = propsRes.data;
       }
       setProperties(pList);
+
+      const totalU = pList.reduce((sum, p) => sum + (p.units?.length || p.unitsCount || 0), 0);
+
+      if (metricsRes && metricsRes.data) {
+        const m = metricsRes.data;
+        setMetrics({
+          totalProperties: m.totalProperties !== undefined ? m.totalProperties : pList.length,
+          totalUnits: m.totalUnits !== undefined ? m.totalUnits : totalU,
+          occupancyRate: typeof m.occupancyRate === 'number' ? `${m.occupancyRate}%` : (m.occupancyRate || '0%'),
+          netIncome: m.netIncome !== undefined ? `$${Number(m.netIncome).toLocaleString()}` : '$0',
+          pendingMaintenance: m.pendingMaintenance || 0,
+        });
+      } else {
+        setMetrics({
+          totalProperties: pList.length,
+          totalUnits: totalU,
+          occupancyRate: '0%',
+          netIncome: '$0',
+          pendingMaintenance: 0,
+        });
+      }
+
+      if (chartsRes && (chartsRes.data?.incomeVsExpenses || chartsRes.incomeVsExpenses)) {
+        const c = chartsRes.data?.incomeVsExpenses || chartsRes.incomeVsExpenses || [];
+        setChartData(c);
+      } else {
+        setChartData([]);
+      }
     } catch (e) {
       console.log('Error fetching owner metrics:', e.message);
     } finally {
@@ -172,7 +183,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
         <View style={styles.kpiCard}>
           <Text style={styles.kpiLabel} allowFontScaling={false}>OCCUPANCY RATE</Text>
           <Text style={[styles.kpiVal, { color: '#10b981' }]} allowFontScaling={false}>{metrics.occupancyRate}</Text>
-          <Text style={styles.kpiSub} allowFontScaling={false}>3 Total Units</Text>
+          <Text style={styles.kpiSub} allowFontScaling={false}>{metrics.totalUnits} Total Units</Text>
         </View>
       </View>
 
@@ -195,50 +206,61 @@ export const OwnerDashboard = ({ onNavigate }) => {
         <Text style={styles.chartTitle} allowFontScaling={false}>INCOME VS OPERATING EXPENSES</Text>
         <View style={styles.divider} />
         
-        {/* Vector Bar Chart */}
-        <View style={styles.chartContainer}>
-          {/* Y-Axis Labels */}
-          <View style={styles.yAxis}>
-            <Text style={styles.yAxisText} allowFontScaling={false}>$2,500</Text>
-            <Text style={styles.yAxisText} allowFontScaling={false}>$1,875</Text>
-            <Text style={styles.yAxisText} allowFontScaling={false}>$1,250</Text>
-            <Text style={styles.yAxisText} allowFontScaling={false}>$625</Text>
-            <Text style={styles.yAxisText} allowFontScaling={false}>$0</Text>
+        {chartData.length === 0 ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ fontSize: 12, color: isDarkMode ? '#94a3b8' : '#64748b' }} allowFontScaling={false}>
+              No financial chart history recorded yet
+            </Text>
           </View>
+        ) : (
+          <>
+            {/* Vector Bar Chart */}
+            <View style={styles.chartContainer}>
+              {/* Y-Axis Labels */}
+              <View style={styles.yAxis}>
+                <Text style={styles.yAxisText} allowFontScaling={false}>$2,500</Text>
+                <Text style={styles.yAxisText} allowFontScaling={false}>$1,875</Text>
+                <Text style={styles.yAxisText} allowFontScaling={false}>$1,250</Text>
+                <Text style={styles.yAxisText} allowFontScaling={false}>$625</Text>
+                <Text style={styles.yAxisText} allowFontScaling={false}>$0</Text>
+              </View>
 
-          {/* Bar Columns */}
-          <View style={styles.barsArea}>
-            {chartData.map((data, index) => {
-              const MAX_BAR_HEIGHT = 95;
-              const incomeHeight = Math.min(MAX_BAR_HEIGHT, Math.max(6, (data.income / 2500) * MAX_BAR_HEIGHT));
-              const expensesHeight = Math.min(MAX_BAR_HEIGHT, Math.max(6, (data.expenses / 2500) * MAX_BAR_HEIGHT));
+              {/* Bar Columns */}
+              <View style={styles.barsArea}>
+                {chartData.map((data, index) => {
+                  const MAX_BAR_HEIGHT = 95;
+                  const maxVal = Math.max(2500, ...chartData.map(d => Math.max(d.income || 0, d.expenses || 0)));
+                  const incomeHeight = Math.min(MAX_BAR_HEIGHT, Math.max(6, ((data.income || 0) / maxVal) * MAX_BAR_HEIGHT));
+                  const expensesHeight = Math.min(MAX_BAR_HEIGHT, Math.max(6, ((data.expenses || 0) / maxVal) * MAX_BAR_HEIGHT));
 
-              return (
-                <View key={index} style={styles.barGroup}>
-                  <View style={styles.barsRow}>
-                    {/* Income Bar (Green) */}
-                    <View style={[styles.bar, styles.incomeBar, { height: incomeHeight }]} />
-                    {/* Expenses Bar (Red) */}
-                    <View style={[styles.bar, styles.expenseBar, { height: expensesHeight }]} />
-                  </View>
-                  <Text style={styles.xAxisText} allowFontScaling={false}>{data.month}</Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
+                  return (
+                    <View key={index} style={styles.barGroup}>
+                      <View style={styles.barsRow}>
+                        {/* Income Bar (Green) */}
+                        <View style={[styles.bar, styles.incomeBar, { height: incomeHeight }]} />
+                        {/* Expenses Bar (Red) */}
+                        <View style={[styles.bar, styles.expenseBar, { height: expensesHeight }]} />
+                      </View>
+                      <Text style={styles.xAxisText} allowFontScaling={false}>{data.month}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
 
-        {/* Legend */}
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#10b981' }]} />
-            <Text style={styles.legendText} allowFontScaling={false}>Net Income</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#ef4444' }]} />
-            <Text style={styles.legendText} allowFontScaling={false}>Operating Expenses</Text>
-          </View>
-        </View>
+            {/* Legend */}
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendColor, { backgroundColor: '#10b981' }]} />
+                <Text style={styles.legendText} allowFontScaling={false}>Net Income</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendColor, { backgroundColor: '#ef4444' }]} />
+                <Text style={styles.legendText} allowFontScaling={false}>Operating Expenses</Text>
+              </View>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Owned Properties List */}
@@ -248,29 +270,15 @@ export const OwnerDashboard = ({ onNavigate }) => {
       </View>
 
       {properties.length === 0 ? (
-        <>
-          <View style={styles.propCard}>
-            <View style={styles.propHeader}>
-              <Ionicons name="business-outline" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
-              <Text style={styles.propName} allowFontScaling={false}>Sky house</Text>
-            </View>
-            <View style={styles.propDetailLine}>
-              <Ionicons name="location-outline" size={13} color="#94a3b8" style={{ marginRight: 4 }} />
-              <Text style={styles.propSub} allowFontScaling={false}>Bhopal mp nagar · 0 Units</Text>
-            </View>
-          </View>
-
-          <View style={styles.propCard}>
-            <View style={styles.propHeader}>
-              <Ionicons name="business-outline" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
-              <Text style={styles.propName} allowFontScaling={false}>property 1</Text>
-            </View>
-            <View style={styles.propDetailLine}>
-              <Ionicons name="location-outline" size={13} color="#94a3b8" style={{ marginRight: 4 }} />
-              <Text style={styles.propSub} allowFontScaling={false}>Indore, indore, Mp, India · 2 Units</Text>
-            </View>
-          </View>
-        </>
+        <View style={[styles.propCard, { alignItems: 'center', paddingVertical: 24 }]}>
+          <Ionicons name="business-outline" size={32} color={isDarkMode ? '#64748b' : '#94a3b8'} style={{ marginBottom: 8 }} />
+          <Text style={[styles.propName, { textAlign: 'center', marginBottom: 4 }]} allowFontScaling={false}>
+            No Properties Assigned
+          </Text>
+          <Text style={[styles.propSub, { textAlign: 'center' }]} allowFontScaling={false}>
+            Properties registered to your portfolio will appear here.
+          </Text>
+        </View>
       ) : (
         properties.map((prop, idx) => (
           <View key={prop.id || `op-${idx}`} style={styles.propCard}>
@@ -281,7 +289,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
             <View style={styles.propDetailLine}>
               <Ionicons name="location-outline" size={13} color="#94a3b8" style={{ marginRight: 4 }} />
               <Text style={styles.propSub} allowFontScaling={false}>
-                {typeof prop.address === 'string' ? prop.address : 'Indore, Mp 42342'} · {prop.units && prop.units.length > 0 ? prop.units.length : (prop.unitsCount || 0)} Units
+                {typeof prop.address === 'string' ? prop.address : (prop.address?.street || prop.city || 'Property Address')} · {prop.units && prop.units.length > 0 ? prop.units.length : (prop.unitsCount || 0)} Units
               </Text>
             </View>
           </View>

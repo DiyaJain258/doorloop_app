@@ -91,11 +91,12 @@ export default function App() {
       case 'applications':
       case 'screening':
       case 'leases':
+      case 'leasing':
       case 'renewals':
       case 'movein':
       case 'moveout':
         setActiveTab('leads');
-        setActiveSubTab(subTab || tabId);
+        setActiveSubTab(subTab || (tabId === 'leasing' ? 'leases' : tabId));
         break;
 
       case 'payments':
@@ -284,7 +285,7 @@ export default function App() {
       case 'Collection Manager':
         return <CollectionDashboard onNavigate={handleNavigate} />;
       case 'Maintenance Staff':
-        return <StaffDashboard />;
+        return <MaintenanceStaffDashboard activeSubTab="dashboard" />;
       case 'Owner':
         return <OwnerDashboard onNavigate={handleNavigate} />;
       case 'Tenant':
@@ -320,6 +321,7 @@ export default function App() {
       case 'integrations':
         return <CompanySettingsScreen initialTab="integrations" onNavigate={handleNavigate} />;
       case 'lease':
+      case 'leasing':
         return role === 'Tenant' ? <TenantLeaseScreen /> : <LeadsScreen initialTab={activeSubTab || 'leases'} onNavigate={handleNavigate} />;
       case 'properties':
         return <PropertiesScreen initialTab={activeSubTab || 'properties'} />;
