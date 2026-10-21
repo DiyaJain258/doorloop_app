@@ -264,11 +264,16 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Manager Switcher Tab: 'dashboard' | 'requests' | 'work_orders' | 'violations' | 'staff'
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const normalizeTab = (t) => {
+    if (t === 'vendors' || t === 'vendor') return 'staff';
+    if (t === 'work-orders') return 'work_orders';
+    return t || 'dashboard';
+  };
+  const [activeTab, setActiveTab] = useState(normalizeTab(initialTab));
 
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab);
+      setActiveTab(normalizeTab(initialTab));
     }
   }, [initialTab]);
 

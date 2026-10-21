@@ -24,9 +24,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { propertySchema, buildingSchema, unitSchema } from '../validations/mobile.validation';
 import { CustomDatePicker } from '../components/CustomDatePicker';
 
-const pTypes = ['Multifamily', 'Commercial', 'Single Family', 'Industrial', 'Condo'];
-const pStatuses = ['Active', 'Inactive', 'Pending'];
-const unitStatuses = ['Vacant', 'Occupied', 'Maintenance'];
+const pTypes = ['Apartment', 'Commercial', 'Single Family', 'Multi Family', 'Mixed-Use Property (MUP)', 'HOA'];
+const pStatuses = ['Active', 'Inactive', 'Under Review', 'Archived', 'Draft'];
+const unitStatuses = ['Vacant', 'Occupied', 'Reserved', 'Under Maintenance'];
 
 // Animated Touchable Component
 const AnimatedTouchable = ({ children, onPress, style, disabled }) => {
@@ -150,8 +150,9 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const [pOwnerId, setPOwnerId] = useState('');
   const [pShare, setPShare] = useState('100');
   const [pMgtCo, setPMgtCo] = useState(user?.companyName || 'Divine Properties');
-  const [pYearBuilt, setPYearBuilt] = useState('2010');
+  const [pYearBuilt, setPYearBuilt] = useState('2020');
   const [pBuildingsCount, setPBuildingsCount] = useState('1');
+  const [pFloorsCount, setPFloorsCount] = useState('3');
   const [pUnitsCount, setPUnitsCount] = useState('10');
   const [pSqft, setPSqft] = useState('8500');
   const [pPurchasePrice, setPPurchasePrice] = useState('2000000');
@@ -201,11 +202,18 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const [uBaths, setUBaths] = useState('2');
   const [uRent, setURent] = useState('1500');
   const [uDeposit, setUDeposit] = useState('1500');
-  const [uAvailDate, setUAvailDate] = useState('2026-08-05');
-  const [uStatus, setUStatus] = useState('Vacant'); // Vacant, Occupied, Maintenance
+  const [uAvailDate, setUAvailDate] = useState(new Date().toISOString().split('T')[0]);
+  const [uStatus, setUStatus] = useState('Vacant'); // Vacant, Occupied, Reserved, Under Maintenance
+
+  // Unit Late Fee & Grace Period (Matching Web)
+  const [uIsLateFeeEnabled, setUIsLateFeeEnabled] = useState(false);
+  const [uLateFeeType, setULateFeeType] = useState('FLAT');
+  const [uLateFeeAmount, setULateFeeAmount] = useState('50');
+  const [uLateFeeGraceDays, setULateFeeGraceDays] = useState('5');
 
   // Vacant Advertising Preference (Screenshot 4)
   const [uWantToAdvertise, setUWantToAdvertise] = useState('yes');
+  const [uAdvertiseTime, setUAdvertiseTime] = useState('now'); // now, later
 
   // Occupied Tenant Onboarding States (Screenshot 5)
   const [uProvideTenantInfo, setUProvideTenantInfo] = useState('now'); // now, later
@@ -236,6 +244,94 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const [showMoveInDatePicker, setShowMoveInDatePicker] = useState(false);
   const [showInvoiceStartDatePicker, setShowInvoiceStartDatePicker] = useState(false);
   const [showDobPicker, setShowDobPicker] = useState(false);
+
+  // Monthly Billing Breakdown State for Occupied Units
+  const [monthPaymentDetails, setMonthPaymentDetails] = useState({});
+  const [applyGlobalLateFee, setApplyGlobalLateFee] = useState(false);
+  const [activeMonthModal, setActiveMonthModal] = useState(null);
+  const [partialAmountInput, setPartialAmountInput] = useState('');
+
+  const generateMonthListFromMoveIn = (moveInDateStr) => {
+    if (!moveInDateStr) return [];
+    const moveInDate = new Date(moveInDateStr);
+    if (isNaN(moveInDate.getTime())) return [];
+
+    const now = new Date();
+    let currentYear = moveInDate.getFullYear();
+    let currentMonth = moveInDate.getMonth();
+
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth();
+
+    if (currentYear > endYear || (currentYear === endYear && currentMonth >= endMonth)) {
+      return [];
+    }
+
+    const months = [];
+    while (
+      currentYear < endYear ||
+      (currentYear === endYear && currentMonth <= endMonth)
+    ) {
+      const monthObj = new Date(currentYear, currentMonth, 1);
+      const id = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+      const label = monthObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const dueDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+
+      months.push({ id, label, dueDate });
+
+      currentMonth++;
+      if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+      if (months.length >= 36) break;
+    }
+
+    return months;
+  };
+
+  const recalculateOutstandingBalance = (details, globalLate) => {
+    const pastMonths = generateMonthListFromMoveIn(tInvoiceStartDate || tMoveInDate);
+    const rentVal = Number(uRent) || 0;
+    let totalUnpaid = 0;
+    pastMonths.forEach((m) => {
+      const d = details[m.id] || { status: 'Unpaid', paidAmount: 0 };
+      const monthLateFee = (globalLate || d.applyLateFee) && d.status !== 'Paid' ? 50 : 0;
+      if (d.status === 'Paid') {
+        // fully paid
+      } else if (d.status === 'Partial') {
+        const pAmt = Math.min(rentVal, Number(d.paidAmount || 0));
+        totalUnpaid += Math.max(0, rentVal + monthLateFee - pAmt);
+      } else {
+        totalUnpaid += (rentVal + monthLateFee);
+      }
+    });
+    setTOutstandingBalance(String(totalUnpaid));
+  };
+
+  const handleUpdateMonthStatus = (monthId, status, paidAmt = 0, applyLate = null) => {
+    setMonthPaymentDetails((prev) => {
+      const rentVal = Number(uRent) || 0;
+      const finalPaid = status === 'Paid' ? rentVal : (status === 'Partial' ? Math.min(rentVal, Number(paidAmt)) : 0);
+      const prevLate = prev[monthId]?.applyLateFee ?? applyGlobalLateFee;
+      const nextDetails = {
+        ...prev,
+        [monthId]: {
+          status,
+          paidAmount: finalPaid,
+          applyLateFee: applyLate !== null ? applyLate : prevLate,
+        },
+      };
+      recalculateOutstandingBalance(nextDetails, applyGlobalLateFee);
+      return nextDetails;
+    });
+    setActiveMonthModal(null);
+  };
+
+  const handleToggleGlobalLateFee = (enabled) => {
+    setApplyGlobalLateFee(enabled);
+    recalculateOutstandingBalance(monthPaymentDetails, enabled);
+  };
 
   // Dropdown states for Add Unit
   const [showUPropDropdown, setShowUPropDropdown] = useState(false);
@@ -455,7 +551,8 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       ownerId: pOwnerId || undefined,
       ownershipPercentage: Number(pShare) || 100,
       managementCompany: pMgtCo || user?.companyName || 'Divine Properties',
-      yearBuilt: Number(pYearBuilt) || 2010,
+      yearBuilt: Number(pYearBuilt) || 2020,
+      totalFloors: Number(pFloorsCount) || 3,
       totalBuildings: Number(pBuildingsCount) || 1,
       totalUnits: Number(pUnitsCount) || 10,
       squareFootage: Number(pSqft) || 8500,
@@ -534,7 +631,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const handleCreateUnit = async (addAnother = false) => {
     setUnitErrors({});
     if (!uPropId) {
-      Alert.alert('Validation Error', 'Associated Property is required.');
+      Alert.alert('Validation Error', 'Target Property is required. Please select a property first.');
       return;
     }
     if (!uNumber.trim()) {
@@ -542,9 +639,13 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       return;
     }
 
+    // Auto-resolve building from property (matching Web exactly - no manual building dropdown required)
+    const autoBuilding = buildings.find(b => b.propertyId === uPropId);
+    const targetBuildingId = autoBuilding?.id || undefined;
+
     const payload = {
       propertyId: uPropId,
-      buildingId: uBuildingId || undefined,
+      buildingId: targetBuildingId,
       unitNumber: uNumber.trim(),
       floor: Number(uFloor) || 1,
       squareFootage: Number(uSqft) || 0,
@@ -555,6 +656,10 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       availabilityDate: uAvailDate ? String(uAvailDate).split('T')[0] : new Date().toISOString().split('T')[0],
       status: uStatus,
       advertiseListing: uStatus === 'Vacant' && uWantToAdvertise === 'yes',
+      isLateFeeEnabled: uIsLateFeeEnabled,
+      lateFeeAmount: uIsLateFeeEnabled ? (Number(uLateFeeAmount) || 50) : 0,
+      lateFeeType: uLateFeeType || 'FLAT',
+      lateFeeGraceDays: uIsLateFeeEnabled ? (Number(uLateFeeGraceDays) || 5) : 5,
     };
 
     const valRes = unitSchema.safeParse(payload);
@@ -855,7 +960,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
   const handleSelectPickerOption = (val) => {
     if (activePicker === 'propType') setPropType(val);
-    if (activePicker === 'owner') setPropOwnerId(val);
+    if (activePicker === 'owner') setPOwnerId(val);
     if (activePicker === 'property') {
       if (isAddBuildingOpen) setBldgPropertyId(val);
       if (isAddUnitOpen) {
@@ -1483,7 +1588,10 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle} allowFontScaling={false}>Add Property</Text>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.modalTitle} allowFontScaling={false}>Add Property</Text>
+                  <Text style={styles.modalSubTitleText} allowFontScaling={false}>Register a new property asset in your management ledger.</Text>
+                </View>
                 <TouchableOpacity onPress={() => setIsAddPropOpen(false)}>
                   <Ionicons name="close" size={24} color="#94a3b8" />
                 </TouchableOpacity>
@@ -1492,14 +1600,14 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={styles.modalSubHeader} allowFontScaling={false}>BASIC INFORMATION</Text>
                 <View style={styles.formGroup}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>PROPERTY NAME</Text>
-                  <TextInput style={styles.formInput} placeholder="e.g. Oakridge Heights" placeholderTextColor="#64748b" value={pName} onChangeText={setPName} />
+                  <Text style={styles.formLabel} allowFontScaling={false}>PROPERTY NAME *</Text>
+                  <TextInput style={styles.formInput} placeholder="Oakridge Heights" placeholderTextColor="#64748b" value={pName} onChangeText={setPName} />
                   {propErrors.name && <Text style={styles.errorLabel} allowFontScaling={false}>{propErrors.name}</Text>}
                 </View>
 
                 {/* Property Type Dropdown */}
                 <View style={[styles.formGroup, showTypeDropdown && { zIndex: 9999, position: 'relative' }]}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>PROPERTY TYPE</Text>
+                  <Text style={styles.formLabel} allowFontScaling={false}>PROPERTY TYPE *</Text>
                   <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowTypeDropdown(!showTypeDropdown)} activeOpacity={0.7}>
                     <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{pType}</Text>
                     <Ionicons name={showTypeDropdown ? "chevron-up" : "chevron-down"} size={16} color="#cbd5e1" />
@@ -1518,7 +1626,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
                 {/* Status Dropdown */}
                 <View style={[styles.formGroup, showStatusDropdown && { zIndex: 9998, position: 'relative' }]}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>INITIAL STATUS</Text>
+                  <Text style={styles.formLabel} allowFontScaling={false}>STATUS *</Text>
                   <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowStatusDropdown(!showStatusDropdown)} activeOpacity={0.7}>
                     <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{pStatus}</Text>
                     <Ionicons name={showStatusDropdown ? "chevron-up" : "chevron-down"} size={16} color="#cbd5e1" />
@@ -1537,36 +1645,36 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
                 <Text style={styles.modalSubHeader} allowFontScaling={false}>ADDRESS COORDINATES</Text>
                 <View style={styles.formGroup}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>STREET ADDRESS</Text>
+                  <Text style={styles.formLabel} allowFontScaling={false}>STREET ADDRESS *</Text>
                   <TextInput style={styles.formInput} placeholder="124 Oakridge Blvd" placeholderTextColor="#64748b" value={pStreet} onChangeText={setPStreet} />
                 </View>
                 <View style={styles.formRow}>
                   <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>CITY</Text>
+                    <Text style={styles.formLabel} allowFontScaling={false}>CITY *</Text>
                     <TextInput style={styles.formInput} placeholder="Austin" placeholderTextColor="#64748b" value={pCity} onChangeText={setPCity} />
                   </View>
                   <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>STATE</Text>
+                    <Text style={styles.formLabel} allowFontScaling={false}>STATE *</Text>
                     <TextInput style={styles.formInput} placeholder="TX" placeholderTextColor="#64748b" value={pState} onChangeText={setPState} />
                   </View>
                 </View>
                 <View style={styles.formRow}>
                   <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>COUNTRY</Text>
+                    <Text style={styles.formLabel} allowFontScaling={false}>COUNTRY *</Text>
                     <TextInput style={styles.formInput} placeholder="USA" placeholderTextColor="#64748b" value={pCountry} onChangeText={setPCountry} />
                   </View>
                   <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>ZIP CODE</Text>
+                    <Text style={styles.formLabel} allowFontScaling={false}>ZIP CODE *</Text>
                     <TextInput style={styles.formInput} placeholder="78701" placeholderTextColor="#64748b" value={pZip} onChangeText={setPZip} />
                   </View>
                 </View>
 
-                {/* NYC BIN (Building Identification Number) */}
+                {/* NYC BIN (Building ID) */}
                 <View style={styles.formGroup}>
                   <Text style={[styles.formLabel, { color: '#f59e0b' }]} allowFontScaling={false}>
-                    NYC BIN (BUILDING IDENTIFICATION NUMBER){' '}
+                    NYC BIN (BUILDING ID){' '}
                     <Text style={{ color: '#94a3b8', fontWeight: 'normal', fontSize: 9 }}>
-                      (OPTIONAL - FOR NYC DOB VIOLATIONS API SYNC)
+                      (OPTIONAL)
                     </Text>
                   </Text>
                   <TextInput
@@ -1578,10 +1686,34 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                   />
                 </View>
 
+                <Text style={styles.modalSubHeader} allowFontScaling={false}>PROPERTY PARAMETERS</Text>
+                <View style={styles.formRow}>
+                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                    <Text style={styles.formLabel} allowFontScaling={false}>TOTAL FLOORS</Text>
+                    <TextInput style={styles.formInput} placeholder="e.g. 3" keyboardType="numeric" placeholderTextColor="#64748b" value={pFloorsCount} onChangeText={setPFloorsCount} />
+                  </View>
+                  <View style={[styles.formGroup, { flex: 1 }]}>
+                    <Text style={styles.formLabel} allowFontScaling={false}>TOTAL UNITS</Text>
+                    <TextInput style={styles.formInput} placeholder="e.g. 10" keyboardType="numeric" placeholderTextColor="#64748b" value={pUnitsCount} onChangeText={setPUnitsCount} />
+                  </View>
+                </View>
+                <View style={styles.formRow}>
+                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                    <Text style={styles.formLabel} allowFontScaling={false}>YEAR BUILT</Text>
+                    <TextInput style={styles.formInput} placeholder="e.g. 2020" keyboardType="numeric" placeholderTextColor="#64748b" value={pYearBuilt} onChangeText={setPYearBuilt} />
+                    {propErrors.yearBuilt && <Text style={styles.errorLabel} allowFontScaling={false}>{propErrors.yearBuilt}</Text>}
+                  </View>
+                  <View style={[styles.formGroup, { flex: 1 }]}>
+                    <Text style={styles.formLabel} allowFontScaling={false}>SQUARE FOOTAGE</Text>
+                    <TextInput style={styles.formInput} placeholder="e.g. 8500" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={pSqft} onChangeText={setPSqft} />
+                    {propErrors.squareFootage && <Text style={styles.errorLabel} allowFontScaling={false}>{propErrors.squareFootage}</Text>}
+                  </View>
+                </View>
+
                 <Text style={styles.modalSubHeader} allowFontScaling={false}>OWNERSHIP STRUCTURE</Text>
                 {/* Owners Dropdown */}
                 <View style={[styles.formGroup, showOwnerDropdown && { zIndex: 9997, position: 'relative' }]}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>OWNER</Text>
+                  <Text style={styles.formLabel} allowFontScaling={false}>OWNER *</Text>
                   <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowOwnerDropdown(!showOwnerDropdown)} activeOpacity={0.7}>
                     <Text style={styles.dropdownTriggerText} allowFontScaling={false}>
                       {owners.find(o => o.id === pOwnerId)?.name || 'Select Owner...'}
@@ -1602,62 +1734,58 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
                 <View style={styles.formRow}>
                   <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>OWNERSHIP PERCENTAGE (%)</Text>
+                    <Text style={styles.formLabel} allowFontScaling={false}>OWNERSHIP PERCENTAGE (%) *</Text>
                     <TextInput style={styles.formInput} placeholder="100" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={pShare} onChangeText={setPShare} />
                     {propErrors.ownershipPercentage && <Text style={styles.errorLabel} allowFontScaling={false}>{propErrors.ownershipPercentage}</Text>}
                   </View>
                   <View style={[styles.formGroup, { flex: 1 }]}>
                     <Text style={styles.formLabel} allowFontScaling={false}>MANAGEMENT COMPANY</Text>
                     <TextInput
-                      style={[styles.formInput, styles.disabledInput]}
-                      value={pMgtCo || user?.companyName || 'Divine Properties'}
-                      editable={false}
+                      style={styles.formInput}
+                      value={pMgtCo}
+                      onChangeText={setPMgtCo}
+                      placeholder="Enter management company name"
                       placeholderTextColor="#64748b"
                     />
                   </View>
                 </View>
 
-                <Text style={styles.modalSubHeader} allowFontScaling={false}>PROPERTY PARAMETERS</Text>
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>YEAR BUILT</Text>
-                    <TextInput style={styles.formInput} placeholder="2010" keyboardType="numeric" placeholderTextColor="#64748b" value={pYearBuilt} onChangeText={setPYearBuilt} />
-                    {propErrors.yearBuilt && <Text style={styles.errorLabel} allowFontScaling={false}>{propErrors.yearBuilt}</Text>}
+                {/* Collapsible Additional Details (Financial Valuation) */}
+                <TouchableOpacity
+                  style={styles.accordionHeader}
+                  onPress={() => setShowPropAdditionalDetails(!showPropAdditionalDetails)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.accordionTitle} allowFontScaling={false}>ADDITIONAL DETAILS (OPTIONAL)</Text>
+                    <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }} allowFontScaling={false}>Financial Valuation, Property Photo & Documents</Text>
                   </View>
-                  <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>TOTAL BUILDINGS</Text>
-                    <TextInput style={styles.formInput} placeholder="1" keyboardType="numeric" placeholderTextColor="#64748b" value={pBuildingsCount} onChangeText={setPBuildingsCount} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#38bdf8' }} allowFontScaling={false}>
+                      {showPropAdditionalDetails ? 'Hide Details' : 'Show Details'}
+                    </Text>
+                    <Ionicons name={showPropAdditionalDetails ? "chevron-up" : "chevron-down"} size={16} color="#38bdf8" />
                   </View>
-                </View>
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>TOTAL UNITS</Text>
-                    <TextInput style={styles.formInput} placeholder="10" keyboardType="numeric" placeholderTextColor="#64748b" value={pUnitsCount} onChangeText={setPUnitsCount} />
-                  </View>
-                  <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>SQUARE FOOTAGE</Text>
-                    <TextInput style={styles.formInput} placeholder="8500" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={pSqft} onChangeText={setPSqft} />
-                    {propErrors.squareFootage && <Text style={styles.errorLabel} allowFontScaling={false}>{propErrors.squareFootage}</Text>}
-                  </View>
-                </View>
+                </TouchableOpacity>
 
-                <Text style={styles.modalSubHeader} allowFontScaling={false}>FINANCIAL VALUATION</Text>
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>PURCHASE PRICE ($)</Text>
-                    <TextInput style={styles.formInput} placeholder="2000000" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={pPurchasePrice} onChangeText={setPPurchasePrice} />
-                    {propErrors.purchasePrice && <Text style={styles.errorLabel} allowFontScaling={false}>{propErrors.purchasePrice}</Text>}
+                {showPropAdditionalDetails && (
+                  <View style={styles.accordionContent}>
+                    <Text style={styles.modalSubHeader} allowFontScaling={false}>FINANCIAL VALUATION (OPTIONAL)</Text>
+                    <View style={styles.formRow}>
+                      <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                        <Text style={styles.formLabel} allowFontScaling={false}>PURCHASE PRICE ($)</Text>
+                        <TextInput style={styles.formInput} placeholder="e.g. 2000000" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={pPurchasePrice} onChangeText={setPPurchasePrice} />
+                      </View>
+                      <View style={[styles.formGroup, { flex: 1 }]}>
+                        <Text style={styles.formLabel} allowFontScaling={false}>CURRENT VALUE ($)</Text>
+                        <TextInput style={styles.formInput} placeholder="e.g. 2200000" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={pCurrentValue} onChangeText={setPCurrentValue} />
+                      </View>
+                    </View>
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel} allowFontScaling={false}>MONTHLY EXPENSES ($)</Text>
+                      <TextInput style={styles.formInput} placeholder="e.g. 4500" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={pExpenses} onChangeText={setPExpenses} />
+                    </View>
                   </View>
-                  <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>CURRENT VALUE ($)</Text>
-                    <TextInput style={styles.formInput} placeholder="2200000" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={pCurrentValue} onChangeText={setPCurrentValue} />
-                    {propErrors.currentValue && <Text style={styles.errorLabel} allowFontScaling={false}>{propErrors.currentValue}</Text>}
-                  </View>
-                </View>
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>MONTHLY EXPENSES ($)</Text>
-                  <TextInput style={styles.formInput} placeholder="4500" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={pExpenses} onChangeText={setPExpenses} />
-                </View>
+                )}
 
                 <View style={styles.modalActions}>
                   <TouchableOpacity style={styles.cancelBtn} onPress={() => setIsAddPropOpen(false)} disabled={submitting}>
@@ -1790,17 +1918,20 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               </View>
 
               <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                {/* TARGET PROPERTY CARD (Screenshot 4) */}
+                {/* TARGET PROPERTY CARD (Matching Web) */}
                 <View style={styles.targetPropertyCard}>
                   <View style={styles.targetPropHeader}>
                     <Ionicons name="business-outline" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
                     <Text style={styles.targetPropHeaderTitle} allowFontScaling={false}>TARGET PROPERTY</Text>
-                    <View style={styles.lockedBadge}>
-                      <Ionicons name="lock-closed" size={10} color="#10b981" style={{ marginRight: 4 }} />
-                      <Text style={styles.lockedBadgeText} allowFontScaling={false}>Property Locked</Text>
-                    </View>
+                    {uPropId ? (
+                      <View style={styles.lockedBadge}>
+                        <Ionicons name="lock-closed" size={10} color="#10b981" style={{ marginRight: 4 }} />
+                        <Text style={styles.lockedBadgeText} allowFontScaling={false}>Property Locked</Text>
+                      </View>
+                    ) : null}
                   </View>
-                  <View style={[styles.formGroup, showUPropDropdown && { zIndex: 9999, position: 'relative' }]}>
+                  <View style={[styles.formGroup, { marginBottom: 0 }, showUPropDropdown && { zIndex: 9999, position: 'relative' }]}>
+                    <Text style={styles.formLabel} allowFontScaling={false}>SELECT PROPERTY *</Text>
                     <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowUPropDropdown(!showUPropDropdown)} activeOpacity={0.7}>
                       <Text style={styles.dropdownTriggerText} allowFontScaling={false}>
                         {properties.find(p => p.id === uPropId)?.name || 'Select Target Property...'}
@@ -1820,316 +1951,739 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                   </View>
                 </View>
 
-                {/* Building Selection (Optional) */}
-                <View style={[styles.formGroup, showUBuildDropdown && { zIndex: 9998, position: 'relative' }]}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>BUILDING (OPTIONAL)</Text>
-                  <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowUBuildDropdown(!showUBuildDropdown)} activeOpacity={0.7}>
-                    <Text style={styles.dropdownTriggerText} allowFontScaling={false}>
-                      {buildings.find(b => b.id === uBuildingId)?.name || 'Select Building...'}
+                {/* IF NO PROPERTY SELECTED YET: EMPTY STATE CARD (Matching Web) */}
+                {!uPropId ? (
+                  <View style={styles.emptyTargetPropBox}>
+                    <View style={styles.emptyTargetPropIconWrap}>
+                      <Ionicons name="business-outline" size={32} color="#38bdf8" />
+                    </View>
+                    <Text style={styles.emptyTargetPropTitle} allowFontScaling={false}>Select a Target Property First</Text>
+                    <Text style={styles.emptyTargetPropSub} allowFontScaling={false}>
+                      Please select a property from the dropdown above. Once selected, the unit configuration details will unlock automatically.
                     </Text>
-                    <Ionicons name={showUBuildDropdown ? "chevron-up" : "chevron-down"} size={16} color="#cbd5e1" />
-                  </TouchableOpacity>
-                  {showUBuildDropdown && (
-                    <View style={styles.dropdownContainer}>
-                      {buildings.filter(b => b.propertyId === uPropId || !uPropId).map((opt) => (
-                        <TouchableOpacity key={opt.id} style={styles.dropdownItem} onPress={() => { setUBuildingId(opt.id); setShowUBuildDropdown(false); }}>
-                          <Text style={styles.dropdownItemText} allowFontScaling={false}>{opt.name}</Text>
-                          {uBuildingId === opt.id && <Ionicons name="checkmark" size={16} color="#38bdf8" />}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>UNIT NUMBER *</Text>
-                  <TextInput style={styles.formInput} placeholder="Suite B / 204" placeholderTextColor="#64748b" value={uNumber} onChangeText={setUNumber} />
-                  {unitErrors.unitNumber && <Text style={styles.errorLabel} allowFontScaling={false}>{unitErrors.unitNumber}</Text>}
-                </View>
-
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>FLOOR</Text>
-                    <TextInput style={styles.formInput} placeholder="Floor 1" keyboardType="numeric" placeholderTextColor="#64748b" value={uFloor} onChangeText={setUFloor} />
                   </View>
-                  <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>SQUARE FOOTAGE</Text>
-                    <TextInput style={styles.formInput} placeholder="850" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={uSqft} onChangeText={setUSqft} />
-                  </View>
-                </View>
-
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>BEDROOMS</Text>
-                    <TextInput style={styles.formInput} placeholder="2" keyboardType="numeric" placeholderTextColor="#64748b" value={uBeds} onChangeText={setUBeds} />
-                  </View>
-                  <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>BATHROOMS</Text>
-                    <TextInput style={styles.formInput} placeholder="2" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={uBaths} onChangeText={setUBaths} />
-                  </View>
-                </View>
-
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>MONTHLY RENT ($) *</Text>
-                    <TextInput style={styles.formInput} placeholder="1500" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={uRent} onChangeText={setURent} />
-                    {unitErrors.rentAmount && <Text style={styles.errorLabel} allowFontScaling={false}>{unitErrors.rentAmount}</Text>}
-                  </View>
-                  <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.formLabel} allowFontScaling={false}>SECURITY DEPOSIT ($)</Text>
-                    <TextInput style={styles.formInput} placeholder="1500" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={uDeposit} onChangeText={setUDeposit} />
-                  </View>
-                </View>
-
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>AVAILABILITY DATE</Text>
-                  <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowAvailDatePicker(true)}>
-                    <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{uAvailDate ? String(uAvailDate).split('T')[0] : 'Select Date...'}</Text>
-                    <Ionicons name="calendar-outline" size={16} color="#cbd5e1" />
-                  </TouchableOpacity>
-                  <CustomDatePicker
-                    visible={showAvailDatePicker}
-                    value={uAvailDate}
-                    onSelect={(date) => setUAvailDate(date)}
-                    onClose={() => setShowAvailDatePicker(false)}
-                  />
-                </View>
-
-                {/* Initial Status Dropdown */}
-                <View style={[styles.formGroup, showUStatusDropdown && { zIndex: 9997, position: 'relative' }]}>
-                  <Text style={styles.formLabel} allowFontScaling={false}>INITIAL STATUS *</Text>
-                  <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowUStatusDropdown(!showUStatusDropdown)} activeOpacity={0.7}>
-                    <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{uStatus}</Text>
-                    <Ionicons name={showUStatusDropdown ? "chevron-up" : "chevron-down"} size={16} color="#cbd5e1" />
-                  </TouchableOpacity>
-                  {showUStatusDropdown && (
-                    <View style={styles.dropdownContainer}>
-                      {unitStatuses.map((opt) => (
-                        <TouchableOpacity key={opt} style={styles.dropdownItem} onPress={() => { setUStatus(opt); setShowUStatusDropdown(false); }}>
-                          <Text style={styles.dropdownItemText} allowFontScaling={false}>{opt}</Text>
-                          {uStatus === opt && <Ionicons name="checkmark" size={16} color="#38bdf8" />}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </View>
-
-                {/* CONDITIONAL VACANT SECTION (Screenshot 4) */}
-                {uStatus === 'Vacant' && (
-                  <View style={styles.vacantAdvertisingBox}>
-                    <View style={styles.vacantHeader}>
-                      <Ionicons name="megaphone-outline" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
-                      <Text style={styles.vacantTitle} allowFontScaling={false}>VACANT UNIT ADVERTISING & LISTING</Text>
-                    </View>
-                    <Text style={styles.vacantSubText} allowFontScaling={false}>
-                      "This unit is vacant. Would you like to advertise/list this vacant unit or apartment?"
-                    </Text>
-                    <View style={styles.toggleRow}>
-                      <TouchableOpacity
-                        style={[styles.toggleBtn, uWantToAdvertise === 'yes' && styles.toggleBtnActive]}
-                        onPress={() => setUWantToAdvertise('yes')}
-                      >
-                        <Text style={[styles.toggleBtnText, uWantToAdvertise === 'yes' && styles.toggleBtnTextActive]} allowFontScaling={false}>Yes</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.toggleBtn, uWantToAdvertise === 'no' && styles.toggleBtnActive]}
-                        onPress={() => setUWantToAdvertise('no')}
-                      >
-                        <Text style={[styles.toggleBtnText, uWantToAdvertise === 'no' && styles.toggleBtnTextActive]} allowFontScaling={false}>No</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-
-                {/* CONDITIONAL OCCUPIED SECTION (Screenshot 5) */}
-                {uStatus === 'Occupied' && (
-                  <View style={styles.occupiedSectionBox}>
-                    <View style={styles.occupiedHeader}>
+                ) : (
+                  <>
+                    {/* UNIT CARD HEADER (Matching Web) */}
+                    <View style={styles.unitCardHeaderBox}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="person-add-outline" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
-                        <Text style={styles.occupiedTitle} allowFontScaling={false}>OCCUPIED TENANT INFORMATION</Text>
-                      </View>
-                      <View style={styles.residentBadge}>
-                        <Text style={styles.residentBadgeText} allowFontScaling={false}>ACTIVE RESIDENT</Text>
-                      </View>
-                    </View>
-
-                    <Text style={styles.vacantSubText} allowFontScaling={false}>
-                      "Would you like to provide the tenant information now or later?"
-                    </Text>
-                    <View style={styles.toggleRow}>
-                      <TouchableOpacity
-                        style={[styles.toggleBtn, uProvideTenantInfo === 'now' && styles.toggleBtnActive]}
-                        onPress={() => setUProvideTenantInfo('now')}
-                      >
-                        <Text style={[styles.toggleBtnText, uProvideTenantInfo === 'now' && styles.toggleBtnTextActive]} allowFontScaling={false}>Now (Enter Details)</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.toggleBtn, uProvideTenantInfo === 'later' && styles.toggleBtnActive]}
-                        onPress={() => setUProvideTenantInfo('later')}
-                      >
-                        <Text style={[styles.toggleBtnText, uProvideTenantInfo === 'later' && styles.toggleBtnTextActive]} allowFontScaling={false}>Later</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {uProvideTenantInfo === 'now' && (
-                      <View style={{ marginTop: 12 }}>
-                        <Text style={styles.modalSubHeader} allowFontScaling={false}>PERSONAL INFORMATION</Text>
-                        <View style={styles.formRow}>
-                          <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                            <Text style={styles.formLabel} allowFontScaling={false}>FIRST NAME *</Text>
-                            <TextInput style={styles.formInput} placeholder="John" placeholderTextColor="#64748b" value={tFirstName} onChangeText={setTFirstName} />
-                          </View>
-                          <View style={[styles.formGroup, { flex: 1 }]}>
-                            <Text style={styles.formLabel} allowFontScaling={false}>LAST NAME *</Text>
-                            <TextInput style={styles.formInput} placeholder="Doe" placeholderTextColor="#64748b" value={tLastName} onChangeText={setTLastName} />
-                          </View>
+                        <View style={styles.unitIndexBadge}>
+                          <Text style={styles.unitIndexBadgeText} allowFontScaling={false}>#1</Text>
                         </View>
-
-                        <View style={styles.formGroup}>
-                          <Text style={styles.formLabel} allowFontScaling={false}>PREFERRED NAME</Text>
-                          <TextInput style={styles.formInput} placeholder="Johnny" placeholderTextColor="#64748b" value={tPreferredName} onChangeText={setTPreferredName} />
-                        </View>
-
-                        <View style={styles.formRow}>
-                          <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                            <Text style={styles.formLabel} allowFontScaling={false}>DATE OF BIRTH</Text>
-                            <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowDobPicker(true)}>
-                              <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{tDob || 'dd/mm/yyyy'}</Text>
-                              <Ionicons name="calendar-outline" size={16} color="#cbd5e1" />
-                            </TouchableOpacity>
-                            <CustomDatePicker
-                              visible={showDobPicker}
-                              value={tDob || new Date().toISOString().split('T')[0]}
-                              onSelect={(d) => setTDob(d)}
-                              onClose={() => setShowDobPicker(false)}
-                            />
-                          </View>
-                          <View style={[styles.formGroup, { flex: 1 }]}>
-                            <Text style={styles.formLabel} allowFontScaling={false}>GENDER</Text>
-                            <TextInput style={styles.formInput} placeholder="Male" placeholderTextColor="#64748b" value={tGender} onChangeText={setTGender} />
-                          </View>
-                        </View>
-
-                        <Text style={styles.modalSubHeader} allowFontScaling={false}>CONTACT & PORTAL CREDENTIALS</Text>
-                        <View style={styles.formGroup}>
-                          <Text style={styles.formLabel} allowFontScaling={false}>EMAIL ADDRESS *</Text>
-                          <TextInput style={styles.formInput} placeholder="john.doe@example.com" keyboardType="email-address" autoCapitalize="none" placeholderTextColor="#64748b" value={tEmail} onChangeText={setTEmail} />
-                        </View>
-
-                        <View style={styles.formRow}>
-                          <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                            <Text style={styles.formLabel} allowFontScaling={false}>MOBILE PHONE *</Text>
-                            <TextInput style={styles.formInput} placeholder="(512) 555-0199" keyboardType="phone-pad" placeholderTextColor="#64748b" value={tPhone} onChangeText={setTPhone} />
-                          </View>
-                          <View style={[styles.formGroup, { flex: 1 }]}>
-                            <Text style={styles.formLabel} allowFontScaling={false}>TENANT PASSWORD *</Text>
-                            <View style={styles.passwordInputContainer}>
-                              <TextInput style={styles.passwordInput} placeholder="******" secureTextEntry={!tShowPassword} placeholderTextColor="#64748b" value={tPassword} onChangeText={setTPassword} />
-                              <TouchableOpacity onPress={() => setTShowPassword(!tShowPassword)}>
-                                <Ionicons name={tShowPassword ? "eye-off-outline" : "eye-outline"} size={16} color="#94a3b8" />
-                              </TouchableOpacity>
+                        <View style={{ marginLeft: 8, flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={styles.unitCardTitle} allowFontScaling={false}>
+                              {uNumber ? `Unit ${uNumber}` : 'Unit #1'}
+                            </Text>
+                            <View style={[styles.statusMiniBadge, uStatus === 'Occupied' ? styles.statusMiniBadgeOccupied : styles.statusMiniBadgeVacant]}>
+                              <Text style={[styles.statusMiniBadgeText, uStatus === 'Occupied' ? { color: '#f59e0b' } : { color: '#10b981' }]} allowFontScaling={false}>
+                                {uStatus}
+                              </Text>
                             </View>
                           </View>
-                        </View>
-
-                        <Text style={styles.modalSubHeader} allowFontScaling={false}>TENANCY DATES & OUTSTANDING BALANCE</Text>
-                        <View style={styles.formRow}>
-                          <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                            <Text style={styles.formLabel} allowFontScaling={false}>MOVE-IN DATE *</Text>
-                            <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowMoveInDatePicker(true)}>
-                              <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{tMoveInDate || 'Select Date...'}</Text>
-                              <Ionicons name="calendar-outline" size={16} color="#cbd5e1" />
-                            </TouchableOpacity>
-                            <CustomDatePicker
-                              visible={showMoveInDatePicker}
-                              value={tMoveInDate}
-                              onSelect={(d) => setTMoveInDate(d)}
-                              onClose={() => setShowMoveInDatePicker(false)}
-                            />
-                          </View>
-                          <View style={[styles.formGroup, { flex: 1 }]}>
-                            <Text style={styles.formLabel} allowFontScaling={false}>INVOICES FROM DATE *</Text>
-                            <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowInvoiceStartDatePicker(true)}>
-                              <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{tInvoiceStartDate || 'Select Date...'}</Text>
-                              <Ionicons name="calendar-outline" size={16} color="#cbd5e1" />
-                            </TouchableOpacity>
-                            <CustomDatePicker
-                              visible={showInvoiceStartDatePicker}
-                              value={tInvoiceStartDate}
-                              onSelect={(d) => setTInvoiceStartDate(d)}
-                              onClose={() => setShowInvoiceStartDatePicker(false)}
-                            />
-                          </View>
-                        </View>
-
-                        <View style={styles.formGroup}>
-                          <Text style={styles.formLabel} allowFontScaling={false}>OUTSTANDING BALANCE ($)</Text>
-                          <TextInput style={styles.formInput} placeholder="0" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={tOutstandingBalance} onChangeText={setTOutstandingBalance} />
-                        </View>
-
-                        {/* Collapsible Additional Details */}
-                        <TouchableOpacity
-                          style={styles.accordionHeader}
-                          onPress={() => setShowTenantAdditionalDetails(!showTenantAdditionalDetails)}
-                        >
-                          <Text style={styles.accordionTitle} allowFontScaling={false}>ADDITIONAL DETAILS (OPTIONAL)</Text>
-                          <Ionicons name={showTenantAdditionalDetails ? "chevron-up" : "chevron-down"} size={16} color="#38bdf8" />
-                        </TouchableOpacity>
-
-                        {showTenantAdditionalDetails && (
-                          <View style={styles.accordionContent}>
-                            <View style={styles.formRow}>
-                              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                                <Text style={styles.formLabel} allowFontScaling={false}>SSN / TAX ID</Text>
-                                <TextInput style={styles.formInput} placeholder="XXX-XX-XXXX" placeholderTextColor="#64748b" value={tSsn} onChangeText={setTSsn} />
-                              </View>
-                              <View style={[styles.formGroup, { flex: 1 }]}>
-                                <Text style={styles.formLabel} allowFontScaling={false}>ID NUMBER</Text>
-                                <TextInput style={styles.formInput} placeholder="DL-99482" placeholderTextColor="#64748b" value={tIdNumber} onChangeText={setTIdNumber} />
-                              </View>
-                            </View>
-                            <View style={styles.formRow}>
-                              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                                <Text style={styles.formLabel} allowFontScaling={false}>EMERGENCY CONTACT</Text>
-                                <TextInput style={styles.formInput} placeholder="Contact Name" placeholderTextColor="#64748b" value={tEmergencyName} onChangeText={setTEmergencyName} />
-                              </View>
-                              <View style={[styles.formGroup, { flex: 1 }]}>
-                                <Text style={styles.formLabel} allowFontScaling={false}>EMERGENCY PHONE</Text>
-                                <TextInput style={styles.formInput} placeholder="(512) 555-4321" keyboardType="phone-pad" placeholderTextColor="#64748b" value={tEmergencyPhone} onChangeText={setTEmergencyPhone} />
-                              </View>
-                            </View>
-                          </View>
-                        )}
-
-                        {/* Workflow Notice Banner (Screenshot 5) */}
-                        <View style={styles.workflowNoticeBanner}>
-                          <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" style={{ marginRight: 8, marginTop: 1 }} />
-                          <Text style={styles.workflowNoticeText} allowFontScaling={false}>
-                            Automated Workflow Execution: Submitting will automatically create the Active Tenant account with portal password, generate an Active Lease agreement, auto-bypass screening, and mark Move-In Workflow as COMPLETED.
+                          <Text style={styles.unitCardSubText} allowFontScaling={false}>
+                            Configure details & tenancy status for this unit layout
                           </Text>
                         </View>
                       </View>
-                    )}
-                  </View>
-                )}
+                    </View>
 
-                <View style={styles.modalActions}>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setIsAddUnitOpen(false)} disabled={submitting}>
-                    <Text style={styles.cancelBtnText} allowFontScaling={false}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.addAnotherBtn} onPress={() => handleCreateUnit(true)} disabled={submitting}>
-                    <Text style={styles.addAnotherBtnText} allowFontScaling={false}>+ Add Another Unit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.submitBtn, submitting && styles.submitBtnDisabled]} onPress={() => handleCreateUnit(false)} disabled={submitting}>
-                    {submitting ? <ActivityIndicator size="small" color="#0f172a" /> : <Text style={styles.submitBtnText} allowFontScaling={false}>Create Unit</Text>}
-                  </TouchableOpacity>
-                </View>
+                    {/* SECTION 1: UNIT PARAMETERS (NO manual building dropdown!) */}
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel} allowFontScaling={false}>UNIT NUMBER *</Text>
+                      <TextInput style={styles.formInput} placeholder="Suite B / 204" placeholderTextColor="#64748b" value={uNumber} onChangeText={setUNumber} />
+                      {unitErrors.unitNumber && <Text style={styles.errorLabel} allowFontScaling={false}>{unitErrors.unitNumber}</Text>}
+                    </View>
+
+                    <View style={styles.formRow}>
+                      <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                        <Text style={styles.formLabel} allowFontScaling={false}>FLOOR</Text>
+                        <TextInput style={styles.formInput} placeholder="1" keyboardType="numeric" placeholderTextColor="#64748b" value={uFloor} onChangeText={setUFloor} />
+                      </View>
+                      <View style={[styles.formGroup, { flex: 1 }]}>
+                        <Text style={styles.formLabel} allowFontScaling={false}>SQUARE FOOTAGE</Text>
+                        <TextInput style={styles.formInput} placeholder="850" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={uSqft} onChangeText={setUSqft} />
+                      </View>
+                    </View>
+
+                    <View style={styles.formRow}>
+                      <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                        <Text style={styles.formLabel} allowFontScaling={false}>BEDROOMS</Text>
+                        <TextInput style={styles.formInput} placeholder="2" keyboardType="numeric" placeholderTextColor="#64748b" value={uBeds} onChangeText={setUBeds} />
+                      </View>
+                      <View style={[styles.formGroup, { flex: 1 }]}>
+                        <Text style={styles.formLabel} allowFontScaling={false}>BATHROOMS</Text>
+                        <TextInput style={styles.formInput} placeholder="2" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={uBaths} onChangeText={setUBaths} />
+                      </View>
+                    </View>
+
+                    <View style={styles.formRow}>
+                      <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                        <Text style={styles.formLabel} allowFontScaling={false}>MONTHLY RENT ($) *</Text>
+                        <TextInput style={styles.formInput} placeholder="1500" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={uRent} onChangeText={setURent} />
+                        {unitErrors.rentAmount && <Text style={styles.errorLabel} allowFontScaling={false}>{unitErrors.rentAmount}</Text>}
+                      </View>
+                      <View style={[styles.formGroup, { flex: 1 }]}>
+                        <Text style={styles.formLabel} allowFontScaling={false}>SECURITY DEPOSIT ($)</Text>
+                        <TextInput style={styles.formInput} placeholder="1500" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={uDeposit} onChangeText={setUDeposit} />
+                      </View>
+                    </View>
+
+                    <View style={styles.formRow}>
+                      {uStatus !== 'Occupied' && (
+                        <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                          <Text style={styles.formLabel} allowFontScaling={false}>AVAILABILITY DATE</Text>
+                          <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowAvailDatePicker(true)}>
+                            <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{uAvailDate ? String(uAvailDate).split('T')[0] : 'Select Date...'}</Text>
+                            <Ionicons name="calendar-outline" size={16} color="#cbd5e1" />
+                          </TouchableOpacity>
+                          <CustomDatePicker
+                            visible={showAvailDatePicker}
+                            value={uAvailDate}
+                            onSelect={(date) => setUAvailDate(date)}
+                            onClose={() => setShowAvailDatePicker(false)}
+                          />
+                        </View>
+                      )}
+
+                      {/* Initial Status Dropdown */}
+                      <View style={[styles.formGroup, { flex: 1 }, showUStatusDropdown && { zIndex: 9997, position: 'relative' }]}>
+                        <Text style={styles.formLabel} allowFontScaling={false}>INITIAL STATUS *</Text>
+                        <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowUStatusDropdown(!showUStatusDropdown)} activeOpacity={0.7}>
+                          <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{uStatus}</Text>
+                          <Ionicons name={showUStatusDropdown ? "chevron-up" : "chevron-down"} size={16} color="#cbd5e1" />
+                        </TouchableOpacity>
+                        {showUStatusDropdown && (
+                          <View style={styles.dropdownContainer}>
+                            {unitStatuses.map((opt) => (
+                              <TouchableOpacity key={opt} style={styles.dropdownItem} onPress={() => { setUStatus(opt); setShowUStatusDropdown(false); }}>
+                                <Text style={styles.dropdownItemText} allowFontScaling={false}>{opt}</Text>
+                                {uStatus === opt && <Ionicons name="checkmark" size={16} color="#38bdf8" />}
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* SECTION 2: UNIT LATE FEE & GRACE PERIOD (OPTIONAL) (Matching Web) */}
+                    <View style={styles.lateFeeBox}>
+                      <View style={styles.lateFeeHeaderRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                          <View style={styles.lateFeeIconBox}>
+                            <Ionicons name="time-outline" size={16} color="#f59e0b" />
+                          </View>
+                          <View style={{ marginLeft: 8, flex: 1 }}>
+                            <Text style={styles.lateFeeTitle} allowFontScaling={false}>LATE FEE & GRACE PERIOD (OPTIONAL)</Text>
+                            <Text style={styles.lateFeeSubtitle} allowFontScaling={false}>Set automated overdue penalty rules specifically for this unit</Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.lateFeeToggleBtn, uIsLateFeeEnabled && styles.lateFeeToggleBtnActive]}
+                          onPress={() => setUIsLateFeeEnabled(!uIsLateFeeEnabled)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.lateFeeToggleBtnText, uIsLateFeeEnabled && styles.lateFeeToggleBtnTextActive]} allowFontScaling={false}>
+                            {uIsLateFeeEnabled ? 'ON' : 'OFF'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {uIsLateFeeEnabled && (
+                        <View style={styles.lateFeeFieldsBox}>
+                          <View style={styles.formRow}>
+                            <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                              <Text style={styles.formLabel} allowFontScaling={false}>FEE AMOUNT ($)</Text>
+                              <TextInput
+                                style={styles.formInput}
+                                placeholder="50"
+                                keyboardType="decimal-pad"
+                                placeholderTextColor="#64748b"
+                                value={uLateFeeAmount}
+                                onChangeText={setULateFeeAmount}
+                              />
+                            </View>
+                            <View style={[styles.formGroup, { flex: 1 }]}>
+                              <Text style={styles.formLabel} allowFontScaling={false}>GRACE PERIOD (DAYS)</Text>
+                              <TextInput
+                                style={styles.formInput}
+                                placeholder="5"
+                                keyboardType="numeric"
+                                placeholderTextColor="#64748b"
+                                value={uLateFeeGraceDays}
+                                onChangeText={setULateFeeGraceDays}
+                              />
+                            </View>
+                          </View>
+                          <View style={styles.rulePreviewBox}>
+                            <Text style={styles.rulePreviewText} allowFontScaling={false}>
+                              Rule Preview: If rent remains unpaid after {uLateFeeGraceDays || 5} days of due date, an automated ${uLateFeeAmount || 50} late fee invoice will be charged to the tenant.
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* SECTION 3: CONDITIONAL VACANT SECTION (Screenshot 4) */}
+                    {uStatus === 'Vacant' && (
+                      <View style={styles.vacantAdvertisingBox}>
+                        <View style={styles.vacantHeader}>
+                          <Ionicons name="megaphone-outline" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
+                          <View>
+                            <Text style={styles.vacantTitle} allowFontScaling={false}>VACANT UNIT ADVERTISING & LISTING</Text>
+                            <Text style={{ fontSize: 9.5, color: '#94a3b8' }} allowFontScaling={false}>Manage marketing and tenant recruitment preferences</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.vacantSubText} allowFontScaling={false}>
+                          "This unit is vacant. Would you like to advertise/list this vacant unit or apartment?"
+                        </Text>
+                        <View style={styles.toggleRow}>
+                          <TouchableOpacity
+                            style={[styles.toggleBtn, uWantToAdvertise === 'yes' && styles.toggleBtnActive]}
+                            onPress={() => setUWantToAdvertise('yes')}
+                          >
+                            <Text style={[styles.toggleBtnText, uWantToAdvertise === 'yes' && styles.toggleBtnTextActive]} allowFontScaling={false}>Yes</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.toggleBtn, uWantToAdvertise === 'no' && styles.toggleBtnActive]}
+                            onPress={() => setUWantToAdvertise('no')}
+                          >
+                            <Text style={[styles.toggleBtnText, uWantToAdvertise === 'no' && styles.toggleBtnTextActive]} allowFontScaling={false}>No</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {uWantToAdvertise === 'yes' && (
+                          <View style={{ marginTop: 10 }}>
+                            <Text style={styles.vacantSubText} allowFontScaling={false}>
+                              "Would you like to advertise this now or later?"
+                            </Text>
+                            <View style={styles.toggleRow}>
+                              <TouchableOpacity
+                                style={[styles.toggleBtn, uAdvertiseTime === 'now' && styles.toggleBtnActive]}
+                                onPress={() => setUAdvertiseTime('now')}
+                              >
+                                <Text style={[styles.toggleBtnText, uAdvertiseTime === 'now' && styles.toggleBtnTextActive]} allowFontScaling={false}>Now (List Immediately)</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.toggleBtn, uAdvertiseTime === 'later' && styles.toggleBtnActive]}
+                                onPress={() => setUAdvertiseTime('later')}
+                              >
+                                <Text style={[styles.toggleBtnText, uAdvertiseTime === 'later' && styles.toggleBtnTextActive]} allowFontScaling={false}>Later (Save Draft)</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    {/* SECTION 4: CONDITIONAL OCCUPIED SECTION (Screenshot 5) */}
+                    {uStatus === 'Occupied' && (
+                      <View style={styles.occupiedSectionBox}>
+                        <View style={styles.occupiedHeader}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="person-add-outline" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
+                            <View>
+                              <Text style={styles.occupiedTitle} allowFontScaling={false}>OCCUPIED TENANT INFORMATION</Text>
+                              <Text style={{ fontSize: 9.5, color: '#94a3b8' }} allowFontScaling={false}>Register existing resident details to auto-generate lease & completed move-in</Text>
+                            </View>
+                          </View>
+                          <View style={styles.residentBadge}>
+                            <Text style={styles.residentBadgeText} allowFontScaling={false}>ACTIVE RESIDENT</Text>
+                          </View>
+                        </View>
+
+                        <Text style={styles.vacantSubText} allowFontScaling={false}>
+                          "Would you like to provide the tenant information now or later?"
+                        </Text>
+                        <View style={styles.toggleRow}>
+                          <TouchableOpacity
+                            style={[styles.toggleBtn, uProvideTenantInfo === 'now' && styles.toggleBtnActive]}
+                            onPress={() => setUProvideTenantInfo('now')}
+                          >
+                            <Text style={[styles.toggleBtnText, uProvideTenantInfo === 'now' && styles.toggleBtnTextActive]} allowFontScaling={false}>Now (Enter Details)</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.toggleBtn, uProvideTenantInfo === 'later' && styles.toggleBtnActive]}
+                            onPress={() => setUProvideTenantInfo('later')}
+                          >
+                            <Text style={[styles.toggleBtnText, uProvideTenantInfo === 'later' && styles.toggleBtnTextActive]} allowFontScaling={false}>Later</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {uProvideTenantInfo === 'now' && (
+                          <View style={{ marginTop: 12 }}>
+                            <Text style={styles.modalSubHeader} allowFontScaling={false}>PERSONAL INFORMATION</Text>
+                            <View style={styles.formRow}>
+                              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                                <Text style={styles.formLabel} allowFontScaling={false}>FIRST NAME *</Text>
+                                <TextInput style={styles.formInput} placeholder="John" placeholderTextColor="#64748b" value={tFirstName} onChangeText={setTFirstName} />
+                              </View>
+                              <View style={[styles.formGroup, { flex: 1 }]}>
+                                <Text style={styles.formLabel} allowFontScaling={false}>LAST NAME *</Text>
+                                <TextInput style={styles.formInput} placeholder="Doe" placeholderTextColor="#64748b" value={tLastName} onChangeText={setTLastName} />
+                              </View>
+                            </View>
+
+                            <View style={styles.formRow}>
+                              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                                <Text style={styles.formLabel} allowFontScaling={false}>PREFERRED NAME</Text>
+                                <TextInput style={styles.formInput} placeholder="Johnny" placeholderTextColor="#64748b" value={tPreferredName} onChangeText={setTPreferredName} />
+                              </View>
+                              <View style={[styles.formGroup, { flex: 1 }]}>
+                                <Text style={styles.formLabel} allowFontScaling={false}>DATE OF BIRTH</Text>
+                                <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowDobPicker(true)}>
+                                  <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{tDob || 'dd/mm/yyyy'}</Text>
+                                  <Ionicons name="calendar-outline" size={16} color="#cbd5e1" />
+                                </TouchableOpacity>
+                                <CustomDatePicker
+                                  visible={showDobPicker}
+                                  value={tDob || new Date().toISOString().split('T')[0]}
+                                  onSelect={(d) => setTDob(d)}
+                                  onClose={() => setShowDobPicker(false)}
+                                />
+                              </View>
+                            </View>
+
+                            <View style={styles.formGroup}>
+                              <Text style={styles.formLabel} allowFontScaling={false}>GENDER</Text>
+                              <TextInput style={styles.formInput} placeholder="Male" placeholderTextColor="#64748b" value={tGender} onChangeText={setTGender} />
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 8 }}>
+                              <Text style={[styles.modalSubHeader, { marginTop: 0, marginBottom: 0 }]} allowFontScaling={false}>CONTACT & TENANT PORTAL CREDENTIALS</Text>
+                              <Text style={{ fontSize: 9, color: '#38bdf8' }} allowFontScaling={false}>DASHBOARD ACCESS SETUP</Text>
+                            </View>
+
+                            <View style={styles.formGroup}>
+                              <Text style={styles.formLabel} allowFontScaling={false}>EMAIL ADDRESS (PORTAL USERNAME) *</Text>
+                              <TextInput style={styles.formInput} placeholder="john.doe@example.com" keyboardType="email-address" autoCapitalize="none" placeholderTextColor="#64748b" value={tEmail} onChangeText={setTEmail} />
+                            </View>
+
+                            <View style={styles.formRow}>
+                              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                                <Text style={styles.formLabel} allowFontScaling={false}>PRIMARY PHONE *</Text>
+                                <TextInput style={styles.formInput} placeholder="(512) 555-0199" keyboardType="phone-pad" placeholderTextColor="#64748b" value={tPhone} onChangeText={setTPhone} />
+                              </View>
+                              <View style={[styles.formGroup, { flex: 1 }]}>
+                                <Text style={styles.formLabel} allowFontScaling={false}>ALTERNATIVE / WORK PHONE</Text>
+                                <TextInput style={styles.formInput} placeholder="(512) 555-0188" keyboardType="phone-pad" placeholderTextColor="#64748b" value={tAltPhone} onChangeText={setTAltPhone} />
+                              </View>
+                            </View>
+
+                            <View style={styles.formGroup}>
+                              <Text style={styles.formLabel} allowFontScaling={false}>TEMPORARY PORTAL PASSWORD *</Text>
+                              <View style={styles.passwordInputContainer}>
+                                <TextInput style={styles.passwordInput} placeholder="******" secureTextEntry={!tShowPassword} placeholderTextColor="#64748b" value={tPassword} onChangeText={setTPassword} />
+                                <TouchableOpacity onPress={() => setTShowPassword(!tShowPassword)}>
+                                  <Ionicons name={tShowPassword ? "eye-off-outline" : "eye-outline"} size={16} color="#94a3b8" />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+
+                            <Text style={styles.modalSubHeader} allowFontScaling={false}>TENANCY DATES & OUTSTANDING BALANCE</Text>
+                            <View style={styles.formRow}>
+                              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                                <Text style={styles.formLabel} allowFontScaling={false}>MOVE-IN DATE *</Text>
+                                <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowMoveInDatePicker(true)}>
+                                  <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{tMoveInDate || 'Select Date...'}</Text>
+                                  <Ionicons name="calendar-outline" size={16} color="#cbd5e1" />
+                                </TouchableOpacity>
+                                <CustomDatePicker
+                                  visible={showMoveInDatePicker}
+                                  value={tMoveInDate}
+                                  onSelect={(d) => setTMoveInDate(d)}
+                                  onClose={() => setShowMoveInDatePicker(false)}
+                                />
+                              </View>
+                              <View style={[styles.formGroup, { flex: 1 }]}>
+                                <Text style={styles.formLabel} allowFontScaling={false}>INVOICES FROM DATE *</Text>
+                                <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setShowInvoiceStartDatePicker(true)}>
+                                  <Text style={styles.dropdownTriggerText} allowFontScaling={false}>{tInvoiceStartDate || 'Select Date...'}</Text>
+                                  <Ionicons name="calendar-outline" size={16} color="#cbd5e1" />
+                                </TouchableOpacity>
+                                <CustomDatePicker
+                                  visible={showInvoiceStartDatePicker}
+                                  value={tInvoiceStartDate}
+                                  onSelect={(d) => {
+                                    setTInvoiceStartDate(d);
+                                    setTimeout(() => recalculateOutstandingBalance(monthPaymentDetails, applyGlobalLateFee), 50);
+                                  }}
+                                  onClose={() => setShowInvoiceStartDatePicker(false)}
+                                />
+                              </View>
+                            </View>
+
+                            {/* MONTHLY BILLING BREAKDOWN (CHIPS/BADGES) FOR OCCUPIED UNITS */}
+                            {(() => {
+                              const pastMonths = generateMonthListFromMoveIn(tInvoiceStartDate || tMoveInDate);
+                              if (pastMonths.length === 0) return null;
+
+                              const rentVal = Number(uRent || 0);
+                              let paidCount = 0;
+                              let partialCount = 0;
+                              let unpaidCount = 0;
+                              let totalPaidAmount = 0;
+                              let totalUnpaidAmount = 0;
+
+                              pastMonths.forEach((m) => {
+                                const d = monthPaymentDetails[m.id] || { status: 'Unpaid', paidAmount: 0 };
+                                const monthLateFee = (applyGlobalLateFee || d.applyLateFee) && d.status !== 'Paid' ? 50 : 0;
+                                if (d.status === 'Paid') {
+                                  paidCount++;
+                                  totalPaidAmount += rentVal;
+                                } else if (d.status === 'Partial') {
+                                  partialCount++;
+                                  const pAmt = Math.min(rentVal, Number(d.paidAmount || 0));
+                                  totalPaidAmount += pAmt;
+                                  totalUnpaidAmount += Math.max(0, rentVal + monthLateFee - pAmt);
+                                } else {
+                                  unpaidCount++;
+                                  totalUnpaidAmount += (rentVal + monthLateFee);
+                                }
+                              });
+
+                              return (
+                                <View style={styles.billingBreakdownCard}>
+                                  <View style={styles.billingBreakdownHeader}>
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="calendar" size={14} color="#38bdf8" style={{ marginRight: 5 }} />
+                                        <Text style={styles.billingBreakdownTitle} allowFontScaling={false}>
+                                          MONTHLY BILLING STATUS ({pastMonths.length} MONTHS PAST)
+                                        </Text>
+                                      </View>
+                                      <Text style={styles.billingBreakdownSubtitle} allowFontScaling={false}>
+                                        Tap a month chip to set: Paid, Partial, or Unpaid.
+                                      </Text>
+                                    </View>
+
+                                    {/* Global Late Fee Toggle */}
+                                    <TouchableOpacity
+                                      style={[
+                                        styles.lateFeeToggleBadge,
+                                        applyGlobalLateFee && styles.lateFeeToggleBadgeActive,
+                                      ]}
+                                      onPress={() => handleToggleGlobalLateFee(!applyGlobalLateFee)}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Ionicons
+                                        name={applyGlobalLateFee ? "checkbox" : "square-outline"}
+                                        size={15}
+                                        color={applyGlobalLateFee ? "#f59e0b" : "#94a3b8"}
+                                      />
+                                      <Text style={styles.lateFeeToggleText} allowFontScaling={false}>
+                                        +$50 Late Fee
+                                      </Text>
+                                    </TouchableOpacity>
+                                  </View>
+
+                                  {/* Summary Counters */}
+                                  <View style={styles.billingSummaryRow}>
+                                    <View style={[styles.billingPill, styles.billingPillPaid]}>
+                                      <Text style={styles.billingPillTextPaid} allowFontScaling={false}>
+                                        Paid: {paidCount} (${totalPaidAmount.toLocaleString()})
+                                      </Text>
+                                    </View>
+                                    {partialCount > 0 && (
+                                      <View style={[styles.billingPill, styles.billingPillPartial]}>
+                                        <Text style={styles.billingPillTextPartial} allowFontScaling={false}>
+                                          Partial: {partialCount}
+                                        </Text>
+                                      </View>
+                                    )}
+                                    <View style={[styles.billingPill, styles.billingPillUnpaid]}>
+                                      <Text style={styles.billingPillTextUnpaid} allowFontScaling={false}>
+                                        Unpaid: {unpaidCount} (${totalUnpaidAmount.toLocaleString()})
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  {/* Month Chips Grid */}
+                                  <View style={styles.monthChipsGrid}>
+                                    {pastMonths.map((m) => {
+                                      const d = monthPaymentDetails[m.id] || { status: 'Unpaid', paidAmount: 0 };
+                                      const monthHasLateFee = (applyGlobalLateFee || d.applyLateFee) && d.status !== 'Paid';
+                                      const monthDue = Math.max(0, rentVal + (monthHasLateFee ? 50 : 0) - (d.paidAmount || 0));
+
+                                      const isPaid = d.status === 'Paid';
+                                      const isPartial = d.status === 'Partial';
+
+                                      return (
+                                        <TouchableOpacity
+                                          key={m.id}
+                                          style={[
+                                            styles.monthStatusChip,
+                                            isPaid
+                                              ? styles.monthChipPaid
+                                              : isPartial
+                                              ? styles.monthChipPartial
+                                              : styles.monthChipUnpaid,
+                                          ]}
+                                          onPress={() => {
+                                            setPartialAmountInput(
+                                              isPartial ? String(d.paidAmount) : String(Math.round(rentVal / 2))
+                                            );
+                                            setActiveMonthModal({
+                                              ...m,
+                                              status: d.status,
+                                              paidAmount: d.paidAmount || 0,
+                                              applyLateFee: Boolean(d.applyLateFee ?? applyGlobalLateFee),
+                                              monthDue,
+                                            });
+                                          }}
+                                        >
+                                          <Ionicons
+                                            name={
+                                              isPaid
+                                                ? "checkmark-circle"
+                                                : isPartial
+                                                ? "time"
+                                                : "close-circle"
+                                            }
+                                            size={13}
+                                            color={isPaid ? "#10b981" : isPartial ? "#f59e0b" : "#ef4444"}
+                                            style={{ marginRight: 4 }}
+                                          />
+                                          <Text
+                                            style={[
+                                              styles.monthStatusChipLabel,
+                                              isPaid
+                                                ? styles.monthChipTextPaid
+                                                : isPartial
+                                                ? styles.monthChipTextPartial
+                                                : styles.monthChipTextUnpaid,
+                                            ]}
+                                            allowFontScaling={false}
+                                          >
+                                            {m.label}
+                                          </Text>
+                                          <Text
+                                            style={[
+                                              styles.monthStatusChipBadge,
+                                              isPaid
+                                                ? styles.monthChipTextPaid
+                                                : isPartial
+                                                ? styles.monthChipTextPartial
+                                                : styles.monthChipTextUnpaid,
+                                            ]}
+                                            allowFontScaling={false}
+                                          >
+                                            {isPaid
+                                              ? '(Paid)'
+                                              : isPartial
+                                              ? `($${d.paidAmount})`
+                                              : `($${monthDue})`}
+                                          </Text>
+                                        </TouchableOpacity>
+                                      );
+                                    })}
+                                  </View>
+                                </View>
+                              );
+                            })()}
+
+                            <View style={styles.formGroup}>
+                              <Text style={styles.formLabel} allowFontScaling={false}>OUTSTANDING BALANCE ($)</Text>
+                              <TextInput style={styles.formInput} placeholder="0" keyboardType="decimal-pad" placeholderTextColor="#64748b" value={tOutstandingBalance} onChangeText={setTOutstandingBalance} />
+                            </View>
+
+                            {/* Collapsible Additional Details */}
+                            <TouchableOpacity
+                              style={styles.accordionHeader}
+                              onPress={() => setShowTenantAdditionalDetails(!showTenantAdditionalDetails)}
+                            >
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.accordionTitle} allowFontScaling={false}>ADDITIONAL DETAILS (OPTIONAL)</Text>
+                                <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }} allowFontScaling={false}>Government IDs, Emergency Contacts, Employment Parameters & Address History</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#38bdf8' }} allowFontScaling={false}>
+                                  {showTenantAdditionalDetails ? 'Hide Details' : 'Show Details'}
+                                </Text>
+                                <Ionicons name={showTenantAdditionalDetails ? "chevron-up" : "chevron-down"} size={16} color="#38bdf8" />
+                              </View>
+                            </TouchableOpacity>
+
+                            {showTenantAdditionalDetails && (
+                              <View style={styles.accordionContent}>
+                                <Text style={styles.modalSubHeader} allowFontScaling={false}>IDENTIFICATION & SOCIAL SECURITY</Text>
+                                <View style={styles.formRow}>
+                                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                                    <Text style={styles.formLabel} allowFontScaling={false}>SSN / TAX ID</Text>
+                                    <TextInput style={styles.formInput} placeholder="XXX-XX-XXXX" placeholderTextColor="#64748b" value={tSsn} onChangeText={setTSsn} />
+                                  </View>
+                                  <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={styles.formLabel} allowFontScaling={false}>ID NUMBER</Text>
+                                    <TextInput style={styles.formInput} placeholder="DL-99482" placeholderTextColor="#64748b" value={tIdNumber} onChangeText={setTIdNumber} />
+                                  </View>
+                                </View>
+                                <Text style={styles.modalSubHeader} allowFontScaling={false}>EMERGENCY CONTACT INFORMATION</Text>
+                                <View style={styles.formRow}>
+                                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                                    <Text style={styles.formLabel} allowFontScaling={false}>EMERGENCY CONTACT NAME</Text>
+                                    <TextInput style={styles.formInput} placeholder="Contact Name" placeholderTextColor="#64748b" value={tEmergencyName} onChangeText={setTEmergencyName} />
+                                  </View>
+                                  <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={styles.formLabel} allowFontScaling={false}>EMERGENCY PHONE</Text>
+                                    <TextInput style={styles.formInput} placeholder="(512) 555-4321" keyboardType="phone-pad" placeholderTextColor="#64748b" value={tEmergencyPhone} onChangeText={setTEmergencyPhone} />
+                                  </View>
+                                </View>
+                                <Text style={styles.modalSubHeader} allowFontScaling={false}>EMPLOYMENT & PROOF OF INCOME</Text>
+                                <View style={styles.formRow}>
+                                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                                    <Text style={styles.formLabel} allowFontScaling={false}>CURRENT EMPLOYER / COMPANY</Text>
+                                    <TextInput style={styles.formInput} placeholder="Company Name" placeholderTextColor="#64748b" value={tEmployer} onChangeText={setTEmployer} />
+                                  </View>
+                                  <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={styles.formLabel} allowFontScaling={false}>EMPLOYER PHONE</Text>
+                                    <TextInput style={styles.formInput} placeholder="(512) 555-9000" keyboardType="phone-pad" placeholderTextColor="#64748b" value={tEmployerPhone} onChangeText={setTEmergencyPhone} />
+                                  </View>
+                                </View>
+                              </View>
+                            )}
+
+                            {/* Workflow Notice Banner (Screenshot 5) */}
+                            <View style={styles.workflowNoticeBanner}>
+                              <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" style={{ marginRight: 8, marginTop: 1 }} />
+                              <Text style={styles.workflowNoticeText} allowFontScaling={false}>
+                                Automated Workflow Execution: Submitting will automatically create the Active Tenant account with portal password, generate an Active Lease agreement, auto-bypass screening, and mark Move-In Workflow as COMPLETED.
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    <View style={styles.modalActions}>
+                      <TouchableOpacity style={styles.cancelBtn} onPress={() => setIsAddUnitOpen(false)} disabled={submitting}>
+                        <Text style={styles.cancelBtnText} allowFontScaling={false}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.addAnotherBtn} onPress={() => handleCreateUnit(true)} disabled={submitting}>
+                        <Text style={styles.addAnotherBtnText} allowFontScaling={false}>+ Add Another Unit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.submitBtn, submitting && styles.submitBtnDisabled]} onPress={() => handleCreateUnit(false)} disabled={submitting}>
+                        {submitting ? <ActivityIndicator size="small" color="#0f172a" /> : <Text style={styles.submitBtnText} allowFontScaling={false}>Create Unit</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* --- MONTH STATUS POPOVER / MODAL (FOR OCCUPIED BILLING BREAKDOWN) --- */}
+      {activeMonthModal && (
+        <Modal visible={true} transparent animationType="fade" onRequestClose={() => setActiveMonthModal(null)}>
+          <View style={styles.monthModalOverlay}>
+            <View style={styles.monthModalCard}>
+              <View style={styles.monthModalHeader}>
+                <Text style={styles.monthModalTitle} allowFontScaling={false}>
+                  {activeMonthModal.label} Payment Status
+                </Text>
+                <TouchableOpacity onPress={() => setActiveMonthModal(null)}>
+                  <Ionicons name="close" size={20} color="#94a3b8" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.monthModalDesc} allowFontScaling={false}>
+                Monthly Rent: ${Number(uRent || 0)}
+              </Text>
+
+              {/* Status Selector Buttons */}
+              <View style={styles.monthStatusBtnGroup}>
+                <TouchableOpacity
+                  style={[
+                    styles.statusSelectBtn,
+                    activeMonthModal.status === 'Paid' && styles.statusSelectBtnPaidActive,
+                  ]}
+                  onPress={() => handleUpdateMonthStatus(activeMonthModal.id, 'Paid')}
+                >
+                  <Ionicons name="checkmark-circle" size={14} color={activeMonthModal.status === 'Paid' ? "#fff" : "#10b981"} style={{ marginRight: 4 }} />
+                  <Text style={[styles.statusSelectBtnText, activeMonthModal.status === 'Paid' && { color: '#fff' }]} allowFontScaling={false}>Full Paid</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.statusSelectBtn,
+                    activeMonthModal.status === 'Partial' && styles.statusSelectBtnPartialActive,
+                  ]}
+                  onPress={() => {
+                    const amt = Number(partialAmountInput || Math.round((Number(uRent) || 0) / 2));
+                    handleUpdateMonthStatus(activeMonthModal.id, 'Partial', amt);
+                  }}
+                >
+                  <Ionicons name="time" size={14} color={activeMonthModal.status === 'Partial' ? "#fff" : "#f59e0b"} style={{ marginRight: 4 }} />
+                  <Text style={[styles.statusSelectBtnText, activeMonthModal.status === 'Partial' && { color: '#fff' }]} allowFontScaling={false}>Partial</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.statusSelectBtn,
+                    activeMonthModal.status === 'Unpaid' && styles.statusSelectBtnUnpaidActive,
+                  ]}
+                  onPress={() => handleUpdateMonthStatus(activeMonthModal.id, 'Unpaid')}
+                >
+                  <Ionicons name="close-circle" size={14} color={activeMonthModal.status === 'Unpaid' ? "#fff" : "#ef4444"} style={{ marginRight: 4 }} />
+                  <Text style={[styles.statusSelectBtnText, activeMonthModal.status === 'Unpaid' && { color: '#fff' }]} allowFontScaling={false}>Unpaid</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Partial Amount Input */}
+              {activeMonthModal.status === 'Partial' && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={styles.formLabel} allowFontScaling={false}>AMOUNT PAID ($)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Enter paid amount"
+                    placeholderTextColor="#64748b"
+                    keyboardType="numeric"
+                    value={partialAmountInput}
+                    onChangeText={setPartialAmountInput}
+                  />
+                  <TouchableOpacity
+                    style={[styles.saveBtn, { marginTop: 8, paddingVertical: 8 }]}
+                    onPress={() => {
+                      const amt = Number(partialAmountInput || 0);
+                      handleUpdateMonthStatus(activeMonthModal.id, 'Partial', amt);
+                    }}
+                  >
+                    <Text style={styles.saveBtnText} allowFontScaling={false}>Apply Partial Amount</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Late Fee Toggle for this month */}
+              {activeMonthModal.status !== 'Paid' && (
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingVertical: 4 }}
+                  onPress={() => {
+                    const nextLate = !activeMonthModal.applyLateFee;
+                    setActiveMonthModal(prev => ({ ...prev, applyLateFee: nextLate }));
+                    handleUpdateMonthStatus(
+                      activeMonthModal.id,
+                      activeMonthModal.status,
+                      activeMonthModal.paidAmount,
+                      nextLate
+                    );
+                  }}
+                >
+                  <Ionicons
+                    name={activeMonthModal.applyLateFee ? "checkbox" : "square-outline"}
+                    size={16}
+                    color="#f59e0b"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#f59e0b' }} allowFontScaling={false}>
+                    Apply $50 Late Fee for this month
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* --- EDIT PROPERTY MODAL --- */}
       <Modal visible={isEditPropOpen} animationType="slide" transparent>
@@ -2844,14 +3398,14 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: colors.surface,
     borderRadius: 12,
-    margin: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
     marginBottom: 0,
     padding: 4,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    width: '100%',
     maxWidth: 1024,
-    alignSelf: 'center',
+    alignSelf: 'stretch',
   },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   tabBtnActive: { backgroundColor: colors.background },
@@ -3147,6 +3701,162 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   },
   lockedBadgeText: { color: '#10b981', fontSize: 9.5, fontWeight: '800' },
 
+  // Target Property Empty State Box
+  emptyTargetPropBox: {
+    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  emptyTargetPropIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  emptyTargetPropTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  emptyTargetPropSub: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+
+  // Unit Card Header
+  unitCardHeaderBox: {
+    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 14,
+  },
+  unitIndexBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unitIndexBadgeText: {
+    fontSize: 12,
+    fontWeight: '850',
+    color: '#38bdf8',
+  },
+  unitCardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  unitCardSubText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  statusMiniBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  statusMiniBadgeVacant: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: '#10b981',
+  },
+  statusMiniBadgeOccupied: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: '#f59e0b',
+  },
+  statusMiniBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+
+  // Unit Late Fee Card
+  lateFeeBox: {
+    backgroundColor: 'rgba(245, 158, 11, 0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  lateFeeHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lateFeeIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lateFeeTitle: {
+    fontSize: 10,
+    fontWeight: '850',
+    color: '#f59e0b',
+    letterSpacing: 0.5,
+  },
+  lateFeeSubtitle: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  lateFeeToggleBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.surface,
+  },
+  lateFeeToggleBtnActive: {
+    backgroundColor: '#f59e0b',
+    borderColor: '#f59e0b',
+  },
+  lateFeeToggleBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.textSecondary,
+  },
+  lateFeeToggleBtnTextActive: {
+    color: '#0f172a',
+  },
+  lateFeeFieldsBox: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(245, 158, 11, 0.15)',
+    paddingTop: 10,
+  },
+  rulePreviewBox: {
+    backgroundColor: colors.inputBackground,
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  rulePreviewText: {
+    fontSize: 10.5,
+    color: colors.textSecondary,
+    lineHeight: 15,
+  },
+
   vacantAdvertisingBox: {
     backgroundColor: 'rgba(56, 189, 248, 0.08)',
     borderWidth: 1,
@@ -3240,6 +3950,208 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     justifyContent: 'center',
   },
   addAnotherBtnText: { color: '#38bdf8', fontSize: 11.5, fontWeight: '800' },
+
+  // Monthly Billing Breakdown Styles
+  billingBreakdownCard: {
+    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  billingBreakdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: isDarkMode ? '#1e293b' : '#e2e8f0',
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  billingBreakdownTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    letterSpacing: 0.5,
+  },
+  billingBreakdownSubtitle: {
+    fontSize: 9.5,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  lateFeeToggleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  lateFeeToggleBadgeActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderColor: '#f59e0b',
+  },
+  lateFeeToggleText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#f59e0b',
+  },
+  billingSummaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  billingPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  billingPillPaid: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  billingPillTextPaid: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#10b981',
+  },
+  billingPillPartial: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  billingPillTextPartial: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#f59e0b',
+  },
+  billingPillUnpaid: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  billingPillTextUnpaid: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#ef4444',
+  },
+  monthChipsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  monthStatusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  monthChipPaid: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  monthChipPartial: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+  },
+  monthChipUnpaid: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  monthStatusChipLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  monthStatusChipBadge: {
+    fontSize: 9.5,
+    marginLeft: 3,
+  },
+  monthChipTextPaid: {
+    color: '#10b981',
+  },
+  monthChipTextPartial: {
+    color: '#f59e0b',
+  },
+  monthChipTextUnpaid: {
+    color: '#ef4444',
+  },
+  // Month Popover Modal
+  monthModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  monthModalCard: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: colors.surface || '#1e293b',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.cardBorder || '#334155',
+    elevation: 8,
+  },
+  monthModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder || '#334155',
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  monthModalTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  monthModalDesc: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginBottom: 10,
+  },
+  monthStatusBtnGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  statusSelectBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? '#0f172a' : '#f1f5f9',
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+  },
+  statusSelectBtnPaidActive: {
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
+  },
+  statusSelectBtnPartialActive: {
+    backgroundColor: '#f59e0b',
+    borderColor: '#f59e0b',
+  },
+  statusSelectBtnUnpaidActive: {
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
+  },
+  statusSelectBtnText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
 });
 
 export default PropertiesScreen;

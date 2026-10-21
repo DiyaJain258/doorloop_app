@@ -131,7 +131,7 @@ export default function App() {
 
       case 'maintenance':
         setActiveTab('maintenance');
-        setActiveSubTab(subTab || 'requests');
+        setActiveSubTab(subTab === 'vendors' || subTab === 'vendor' ? 'staff' : (subTab || 'dashboard'));
         break;
 
       case 'admin':
