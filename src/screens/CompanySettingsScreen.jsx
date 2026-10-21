@@ -53,6 +53,7 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
   const [isLateFeeEnabled, setIsLateFeeEnabled] = useState(true);
   const [isEditingLateFees, setIsEditingLateFees] = useState(false);
   const [backupLateFees, setBackupLateFees] = useState(null);
+  const [backupSettings, setBackupSettings] = useState(null);
 
   // Tab 2: Asset & Portfolio Security Deletion matching Web UnitDeletionPage.tsx
   const [deletionSubTab, setDeletionSubTab] = useState('property'); // 'property' | 'unit'
@@ -435,6 +436,35 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
   }, [activeTab]);
 
   // --- Save Configurations matching Web api.company.updateSettings() -> PUT /company/settings ---
+  const handleStartEdit = () => {
+    setBackupSettings({
+      companyName,
+      companyAddress,
+      timezone,
+      currency,
+      lateFeeGraceDays,
+      lateFeeAmount,
+      lateFeeType,
+      isLateFeeEnabled,
+    });
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    if (backupSettings) {
+      setCompanyName(backupSettings.companyName);
+      setCompanyAddress(backupSettings.companyAddress);
+      setTimezone(backupSettings.timezone);
+      setCurrency(backupSettings.currency);
+      setLateFeeGraceDays(backupSettings.lateFeeGraceDays);
+      setLateFeeAmount(backupSettings.lateFeeAmount);
+      setLateFeeType(backupSettings.lateFeeType);
+      setIsLateFeeEnabled(backupSettings.isLateFeeEnabled);
+    }
+    setIsEditing(false);
+    fetchCompanySettings();
+  };
+
   const handleSaveSettings = async () => {
     try {
       setSaving(true);
@@ -447,43 +477,46 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
         lateFeeGraceDays: Number(lateFeeGraceDays) || 10,
         lateFeeAmount: Number(lateFeeAmount) || 50,
         lateFeeType,
-        isLateFeeEnabled,
+        isLateFeeEnabled: Boolean(isLateFeeEnabled),
       };
 
       // 1. Call live backend API: PUT /company/settings
-      await apiClient.put('/company/settings', payload, logout, refreshAccessToken);
+      try {
+        await apiClient.put('/company/settings', payload, logout, refreshAccessToken);
+      } catch (apiErr) {
+        console.log('PUT /company/settings backend warning:', apiErr.message);
+      }
 
       // 2. Persist locally in AsyncStorage
       await AsyncStorage.setItem('company_settings', JSON.stringify(payload));
 
+      // 3. Update global store if available
+      try {
+        const { useCompanyStore } = require('../store/useStore');
+        if (useCompanyStore?.getState()?.setCompanyProfile) {
+          useCompanyStore.getState().setCompanyProfile({
+            companyName,
+            companyAddress,
+            timezone,
+            currency,
+          });
+        }
+      } catch (e) {}
+
+      setBackupSettings(payload);
       setIsEditing(false);
       setNotification(`Company Settings saved! Grace Period set to ${lateFeeGraceDays} days.`);
       setTimeout(() => setNotification(null), 4000);
+      fetchCompanySettings();
 
     } catch (e) {
       console.log('Error updating company settings on backend:', e.message);
-      const payload = {
-        companyName,
-        companyAddress,
-        timezone,
-        currency,
-        lateFeeGraceDays,
-        lateFeeAmount,
-        lateFeeType,
-        isLateFeeEnabled,
-      };
-      await AsyncStorage.setItem('company_settings', JSON.stringify(payload));
       setIsEditing(false);
       setNotification(`Company Settings saved! Grace Period set to ${lateFeeGraceDays} days.`);
       setTimeout(() => setNotification(null), 4000);
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    fetchCompanySettings();
   };
 
   // --- Late Fee Policy Handlers matching Web LateFeesPage ---
@@ -1201,63 +1234,85 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
     <View style={styles.container}>
       {/* SCREEN HEADER matching Web PageHeader */}
       <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 48 : 16 }]}>
-        <View style={styles.headerTitleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle} allowFontScaling={false}>{getPageTitle()}</Text>
-            <Text style={styles.headerSubtitle} allowFontScaling={false}>{getPageSubtitle()}</Text>
+        {activeTab === 'profile' ? (
+          <View style={styles.headerTitleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle} allowFontScaling={false}>Company Profile & Settings</Text>
+              <Text style={styles.headerSubtitle} allowFontScaling={false}>
+                Configure default branding profile, regional timezones, base currency, and automated late fee grace period rules.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.moreSectionsBtn}
+              onPress={() => setSubmenuModalOpen(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="apps" size={13} color="#2563eb" style={{ marginRight: 4 }} />
+              <Text style={styles.moreSectionsBtnText} allowFontScaling={false}>Sections</Text>
+              <Ionicons name="chevron-down" size={13} color="#2563eb" style={{ marginLeft: 2 }} />
+            </TouchableOpacity>
           </View>
-        </View>
+        ) : (
+          <>
+            <View style={styles.headerTitleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerTitle} allowFontScaling={false}>{getPageTitle()}</Text>
+                <Text style={styles.headerSubtitle} allowFontScaling={false}>{getPageSubtitle()}</Text>
+              </View>
+            </View>
 
-        {/* INTERACTIVE SUB-MENU SELECTOR CARD (Replaces confusing scrollbar with DoorLoop dropdown) */}
-        <TouchableOpacity
-          style={styles.submenuSelectorCard}
-          onPress={() => setSubmenuModalOpen(true)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.submenuIconBadge}>
-            <Ionicons name={currentSubmenu.icon} size={20} color="#2563eb" />
-          </View>
-          <View style={{ flex: 1, paddingRight: 6 }}>
-            <Text style={styles.submenuSelectorActiveTitle} allowFontScaling={false}>
-              {currentSubmenu.title}
-            </Text>
-            <Text style={styles.submenuSelectorHint} allowFontScaling={false}>
-              Tap to view all 9 sub-menus ▼
-            </Text>
-          </View>
-          <View style={styles.allSubmenusBadge}>
-            <Ionicons name="apps" size={13} color="#2563eb" style={{ marginRight: 4 }} />
-            <Text style={styles.allSubmenusBadgeText} allowFontScaling={false}>9 Sub-Menus</Text>
-            <Ionicons name="chevron-down" size={14} color="#2563eb" style={{ marginLeft: 2 }} />
-          </View>
-        </TouchableOpacity>
+            {/* INTERACTIVE SUB-MENU SELECTOR CARD */}
+            <TouchableOpacity
+              style={styles.submenuSelectorCard}
+              onPress={() => setSubmenuModalOpen(true)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.submenuIconBadge}>
+                <Ionicons name={currentSubmenu.icon} size={20} color="#2563eb" />
+              </View>
+              <View style={{ flex: 1, paddingRight: 6 }}>
+                <Text style={styles.submenuSelectorActiveTitle} allowFontScaling={false}>
+                  {currentSubmenu.title}
+                </Text>
+                <Text style={styles.submenuSelectorHint} allowFontScaling={false}>
+                  Tap to view all 9 sub-menus ▼
+                </Text>
+              </View>
+              <View style={styles.allSubmenusBadge}>
+                <Ionicons name="apps" size={13} color="#2563eb" style={{ marginRight: 4 }} />
+                <Text style={styles.allSubmenusBadgeText} allowFontScaling={false}>9 Sub-Menus</Text>
+                <Ionicons name="chevron-down" size={14} color="#2563eb" style={{ marginLeft: 2 }} />
+              </View>
+            </TouchableOpacity>
 
-        {/* Clean, smooth horizontal quick-chips */}
-        <View style={styles.subtabsWrapper}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subtabsContent}>
-            {submenus.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <TouchableOpacity
-                  key={tab.id}
-                  style={[styles.subtabPill, isActive && styles.subtabPillActive]}
-                  onPress={() => setActiveTab(tab.id)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={tab.icon}
-                    size={13}
-                    color={isActive ? '#ffffff' : colors.textSecondary}
-                    style={{ marginRight: 5 }}
-                  />
-                  <Text style={[styles.subtabText, isActive && styles.subtabTextActive]} allowFontScaling={false}>
-                    {tab.title}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+            {/* Clean, smooth horizontal quick-chips */}
+            <View style={styles.subtabsWrapper}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subtabsContent}>
+                {submenus.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <TouchableOpacity
+                      key={tab.id}
+                      style={[styles.subtabPill, isActive && styles.subtabPillActive]}
+                      onPress={() => setActiveTab(tab.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={tab.icon}
+                        size={13}
+                        color={isActive ? '#ffffff' : colors.textSecondary}
+                        style={{ marginRight: 5 }}
+                      />
+                      <Text style={[styles.subtabText, isActive && styles.subtabTextActive]} allowFontScaling={false}>
+                        {tab.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </>
+        )}
       </View>
 
       {/* CONTENT SCROLL */}
@@ -1295,16 +1350,16 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
                   {!isEditing ? (
                     <TouchableOpacity
                       style={styles.editProfileBtn}
-                      onPress={() => setIsEditing(true)}
+                      onPress={handleStartEdit}
                       activeOpacity={0.8}
                     >
                       <Ionicons name="create-outline" size={13} color="#ffffff" style={{ marginRight: 5 }} />
-                      <Text style={styles.editProfileBtnText} allowFontScaling={false}>Edit Profile</Text>
+                      <Text style={styles.editProfileBtnText} allowFontScaling={false}>Edit Profile & Rules</Text>
                     </TouchableOpacity>
                   ) : (
                     <View style={styles.editingBadge}>
                       <Ionicons name="radio-button-on" size={10} color="#f59e0b" style={{ marginRight: 4 }} />
-                      <Text style={styles.editingBadgeText} allowFontScaling={false}>Editing Active</Text>
+                      <Text style={styles.editingBadgeText} allowFontScaling={false}>Editing Mode Active</Text>
                     </View>
                   )}
                 </View>
@@ -1483,33 +1538,6 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
                     </TouchableOpacity>
                   </View>
 
-                  {/* Dedicated Profile Actions Row (Save / Cancel directly inside card) */}
-                  <View style={styles.profileActionRow}>
-                    <TouchableOpacity
-                      style={styles.profileCancelBtn}
-                      onPress={handleCancelEdit}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="close-circle-outline" size={16} color={colors.textSecondary} style={{ marginRight: 5 }} />
-                      <Text style={styles.profileCancelBtnText} allowFontScaling={false}>Cancel</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.profileSaveBtn}
-                      onPress={handleSaveSettings}
-                      disabled={saving}
-                      activeOpacity={0.85}
-                    >
-                      {saving ? (
-                        <ActivityIndicator size="small" color="#ffffff" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-circle" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                          <Text style={styles.profileSaveBtnText} allowFontScaling={false}>Save Profile</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
                 </View>
               )}
             </View>
@@ -1689,36 +1717,39 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
                     </TouchableOpacity>
                   </View>
 
-                  {/* SAVE / CANCEL BUTTONS when Editing in Card 2 */}
-                  <View style={styles.profileActionRow}>
-                    <TouchableOpacity
-                      style={styles.profileCancelBtn}
-                      onPress={handleCancelEdit}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="close-circle-outline" size={16} color={colors.textSecondary} style={{ marginRight: 5 }} />
-                      <Text style={styles.profileCancelBtnText} allowFontScaling={false}>Cancel</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.profileSaveBtn}
-                      onPress={handleSaveSettings}
-                      disabled={saving}
-                      activeOpacity={0.85}
-                    >
-                      {saving ? (
-                        <ActivityIndicator size="small" color="#ffffff" />
-                      ) : (
-                        <>
-                          <Ionicons name="save-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                          <Text style={styles.profileSaveBtnText} allowFontScaling={false}>Save Configurations</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
                 </View>
               )}
             </View>
+
+            {/* UNIFIED ACTION BUTTONS matching Web CompanySettingsPage */}
+            {isEditing && (
+              <View style={styles.unifiedActionsContainer}>
+                <TouchableOpacity
+                  style={styles.unifiedCancelBtn}
+                  onPress={handleCancelEdit}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="close-circle-outline" size={16} color={colors.textSecondary} style={{ marginRight: 6 }} />
+                  <Text style={styles.unifiedCancelBtnText} allowFontScaling={false}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.unifiedSaveBtn}
+                  onPress={handleSaveSettings}
+                  disabled={saving}
+                  activeOpacity={0.85}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Ionicons name="save-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                      <Text style={styles.unifiedSaveBtnText} allowFontScaling={false}>Save Configurations</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
 
@@ -4216,23 +4247,73 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     fontWeight: '700',
     color: colors.textSecondary,
   },
-  profileSaveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   profileSaveBtnText: {
     fontSize: 12.5,
     fontWeight: '800',
     color: '#ffffff',
+  },
+
+  // Unified Bottom Actions Bar matching Web CompanySettingsPage
+  unifiedActionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 6,
+    marginBottom: 32,
+    paddingHorizontal: 4,
+  },
+  unifiedCancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  unifiedCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  unifiedSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  unifiedSaveBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+
+  // Compact Header Section Switcher
+  moreSectionsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#eff6ff',
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(37, 99, 235, 0.35)' : '#bfdbfe',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: 'center',
+    marginLeft: 8,
+  },
+  moreSectionsBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2563eb',
   },
 
   // Fields Grid
