@@ -90,27 +90,34 @@ export const AdminDashboard = ({ onNavigate }) => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [statsRes, companiesRes] = await Promise.all([
-        apiClient.get('/superadmin/stats', logout, refreshAccessToken),
-        apiClient.get('/superadmin/companies', logout, refreshAccessToken),
+      const [statsRes, companiesRes, propsRes] = await Promise.all([
+        apiClient.get('/superadmin/stats', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/superadmin/companies', logout, refreshAccessToken).catch(() => apiClient.get('/companies', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/properties', logout, refreshAccessToken).catch(() => null),
       ]);
+
+      const companiesList = companiesRes?.data || (Array.isArray(companiesRes) ? companiesRes : []);
+      const propsList = propsRes?.data || (Array.isArray(propsRes) ? propsRes : []);
 
       if (statsRes && statsRes.data) {
         setStats({
-          activeCompanies: statsRes.data.activeCompanies !== undefined ? statsRes.data.activeCompanies : (statsRes.data.totalCompanies !== undefined ? statsRes.data.totalCompanies : 0),
+          activeCompanies: statsRes.data.activeCompanies !== undefined ? statsRes.data.activeCompanies : (statsRes.data.totalCompanies !== undefined ? statsRes.data.totalCompanies : companiesList.length),
           activeUsers: statsRes.data.totalUsers !== undefined ? statsRes.data.totalUsers : (statsRes.data.activeUsers !== undefined ? statsRes.data.activeUsers : 0),
           mrrRevenue: statsRes.data.totalArr !== undefined ? statsRes.data.totalArr : (statsRes.data.mrrRevenue !== undefined ? statsRes.data.mrrRevenue : 0),
-          activeSubscriptions: statsRes.data.activeSubscriptions !== undefined ? statsRes.data.activeSubscriptions : (statsRes.data.activeCompanies !== undefined ? statsRes.data.activeCompanies : 0),
+          activeSubscriptions: statsRes.data.activeSubscriptions !== undefined ? statsRes.data.activeSubscriptions : (statsRes.data.activeCompanies !== undefined ? statsRes.data.activeCompanies : companiesList.length),
           storageUsed: statsRes.data.storageUsed || '0.0 GB',
+        });
+      } else {
+        setStats({
+          activeCompanies: companiesList.length,
+          activeUsers: 0,
+          mrrRevenue: 0,
+          activeSubscriptions: companiesList.length,
+          storageUsed: '0.0 GB',
         });
       }
 
-      if (companiesRes && (Array.isArray(companiesRes) || companiesRes.data)) {
-        const list = Array.isArray(companiesRes) ? companiesRes : companiesRes.data;
-        setCompanies(list);
-      } else {
-        setCompanies([]);
-      }
+      setCompanies(companiesList);
     } catch (e) {
       console.log('Error fetching superadmin dashboard data:', e.message);
     } finally {

@@ -93,8 +93,8 @@ export const CollectionDashboard = () => {
       setLoading(true);
       const [metricsRes, paymentsRes, expensesRes] = await Promise.all([
         apiClient.get('/dashboard/metrics', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/payments', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/portal/expenses', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/payments', logout, refreshAccessToken).catch(() => apiClient.get('/portal/payments', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/expenses', logout, refreshAccessToken).catch(() => apiClient.get('/portal/expenses', logout, refreshAccessToken).catch(() => null)),
       ]);
 
       const mData = metricsRes?.data || metricsRes || {};

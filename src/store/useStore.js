@@ -5,7 +5,7 @@ import { apiClient } from '../api/client';
 
 // Safe storage wrapper to prevent native module crashes in Expo Go
 let localCache = {};
-const safeStorage = {
+export const safeStorage = {
   getItem: async (key) => {
     try {
       if (AsyncStorage && typeof AsyncStorage.getItem === 'function') {

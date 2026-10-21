@@ -60,9 +60,9 @@ export const TenantDashboard = ({ onNavigate }) => {
     try {
       setLoading(true);
       const [leasesRes, metricsRes, screeningRes] = await Promise.all([
-        apiClient.get('/portal/tenant/leases', logout, refreshAccessToken),
-        apiClient.get('/portal/tenant/metrics', logout, refreshAccessToken),
-        apiClient.get('/portal/screening/reports', logout, refreshAccessToken),
+        apiClient.get('/leases', logout, refreshAccessToken).catch(() => apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/portal/tenant/metrics', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/screening/reports', logout, refreshAccessToken).catch(() => apiClient.get('/portal/screening/reports', logout, refreshAccessToken).catch(() => null)),
       ]);
 
       const leases = leasesRes?.data || leasesRes || [];

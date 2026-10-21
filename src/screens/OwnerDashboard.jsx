@@ -45,27 +45,42 @@ export const OwnerDashboard = ({ onNavigate }) => {
   const fetchLiveOwnerData = async () => {
     try {
       setLoading(true);
-      const [metricsRes, propsRes] = await Promise.all([
+      const [metricsRes, propsRes, unitsRes, paymentsRes, reqRes] = await Promise.all([
         apiClient.get('/portal/owner/metrics', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/properties', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/units', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/payments', logout, refreshAccessToken).catch(() => apiClient.get('/portal/payments', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/maintenance/requests', logout, refreshAccessToken).catch(() => apiClient.get('/portal/maintenance/requests', logout, refreshAccessToken).catch(() => null)),
       ]);
 
-      if (metricsRes && metricsRes.data) {
-        const m = metricsRes.data;
-        setMetrics({
-          totalProperties: m.totalProperties !== undefined ? m.totalProperties : 0,
-          occupancyRate: typeof m.occupancyRate === 'number' ? `${m.occupancyRate}%` : (m.occupancyRate || '0%'),
-          netIncome: m.netIncome !== undefined ? `$${Number(m.netIncome).toLocaleString()}` : '$0',
-          pendingMaintenance: m.pendingMaintenance || 0,
+      const pList = Array.isArray(propsRes) ? propsRes : (propsRes?.data || []);
+      const uList = Array.isArray(unitsRes) ? unitsRes : (unitsRes?.data || []);
+      const payList = Array.isArray(paymentsRes) ? paymentsRes : (paymentsRes?.data || []);
+      const reqList = Array.isArray(reqRes) ? reqRes : (reqRes?.data || []);
+
+      const totalProps = pList.length;
+      let totalUnits = uList.length;
+      let occupiedUnits = uList.filter(u => String(u.status).toLowerCase() === 'occupied' || u.tenant || u.tenantId).length;
+
+      if (totalUnits === 0 && pList.length > 0) {
+        pList.forEach(p => {
+          totalUnits += (p.unitsCount || 0);
+          occupiedUnits += (p.occupiedUnits || 0);
         });
       }
 
-      let pList = [];
-      if (propsRes && Array.isArray(propsRes)) {
-        pList = propsRes;
-      } else if (propsRes && propsRes.data && Array.isArray(propsRes.data)) {
-        pList = propsRes.data;
-      }
+      const calculatedOccupancy = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+      const calculatedRevenue = payList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const pendingReqs = reqList.filter(r => r.status !== 'Completed' && r.status !== 'Resolved').length;
+
+      const m = metricsRes?.data || metricsRes || {};
+      setMetrics({
+        totalProperties: m.totalProperties !== undefined ? m.totalProperties : totalProps,
+        occupancyRate: typeof m.occupancyRate === 'number' ? `${m.occupancyRate}%` : (m.occupancyRate || `${calculatedOccupancy}%`),
+        netIncome: m.netIncome !== undefined ? `$${Number(m.netIncome).toLocaleString()}` : `$${calculatedRevenue.toLocaleString()}`,
+        pendingMaintenance: m.pendingMaintenance !== undefined ? m.pendingMaintenance : pendingReqs,
+      });
+
       setProperties(pList);
     } catch (e) {
       console.log('Error fetching owner metrics:', e.message);
