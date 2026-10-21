@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  SafeAreaView,
   Platform,
   LayoutAnimation,
   UIManager,
@@ -266,7 +265,7 @@ export const NavigationDrawer = ({ visible, onClose, activeScreen, activeTab, on
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
         <View style={styles.drawerContainer}>
-          <SafeAreaView style={styles.safeArea}>
+          <View style={styles.safeArea}>
             {/* Header with User Info */}
             <View style={styles.userHeader}>
               <View style={styles.avatarCircle}>
@@ -400,7 +399,7 @@ export const NavigationDrawer = ({ visible, onClose, activeScreen, activeTab, on
                 </Text>
               </TouchableOpacity>
             </ScrollView>
-          </SafeAreaView>
+          </View>
         </View>
       </View>
     </Modal>

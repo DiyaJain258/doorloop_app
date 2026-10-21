@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -23,7 +23,7 @@ export class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
           <ScrollView contentContainerStyle={styles.content}>
             <Text style={styles.title}>Something went wrong</Text>
             <Text style={styles.subtitle}>
@@ -43,7 +43,7 @@ export class ErrorBoundary extends React.Component {
               <Text style={styles.retryBtnText}>Retry / Reload</Text>
             </TouchableOpacity>
           </ScrollView>
-        </SafeAreaView>
+        </View>
       );
     }
     return this.props.children;

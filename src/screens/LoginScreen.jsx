@@ -13,7 +13,6 @@ import {
   Image,
   Modal,
   Alert,
-  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../api/client';
@@ -190,7 +189,7 @@ export const LoginScreen = () => {
 
             {/* 3-Step Public Tenant Registration Full-Screen Native Modal */}
             <Modal visible={signupModalVisible} animationType="slide" presentationStyle="fullScreen">
-              <SafeAreaView style={styles.modalFullScreenBgDark}>
+              <View style={styles.modalFullScreenBgDark}>
                 <KeyboardAvoidingView
                   behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                   style={{ flex: 1 }}
@@ -695,7 +694,7 @@ export const LoginScreen = () => {
                     )}
                   </ScrollView>
                 </KeyboardAvoidingView>
-              </SafeAreaView>
+              </View>
             </Modal>
           </ScrollView>
         </KeyboardAvoidingView>

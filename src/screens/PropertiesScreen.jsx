@@ -12,7 +12,6 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
-  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../api/client';
@@ -870,7 +869,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <View style={styles.container}>
         {/* TOP BAR: TITLE + ACTION */}
         <View style={styles.topHeader}>
@@ -2032,7 +2031,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
           </KeyboardAvoidingView>
         </Modal>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

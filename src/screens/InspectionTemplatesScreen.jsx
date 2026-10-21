@@ -7,7 +7,6 @@ import {
   FlatList,
   Modal,
   TextInput,
-  SafeAreaView,
   ScrollView,
   Alert,
 } from 'react-native';
@@ -67,7 +66,7 @@ export const InspectionTemplatesScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title} allowFontScaling={false}>Inspection Templates</Text>
@@ -153,7 +152,7 @@ export const InspectionTemplatesScreen = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
