@@ -492,7 +492,7 @@ export const ManagerCommunicationScreen = () => {
             {/* Delivery warnings banner */}
             <View style={styles.alertBanner}>
               <View style={styles.alertHeader}>
-                <Ionicons name="shield-alert-outline" size={20} color="#ef4444" style={{ marginRight: 8 }} />
+                <Ionicons name="alert-circle-outline" size={20} color="#ef4444" style={{ marginRight: 8 }} />
                 <Text style={styles.alertTitle} allowFontScaling={false}>OUTBOUND DELIVERY ISSUES</Text>
               </View>
               <Text style={styles.alertDesc} allowFontScaling={false}>

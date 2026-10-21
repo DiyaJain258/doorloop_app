@@ -13,7 +13,7 @@ import { useAuthStore, useThemeStore } from '../store/useStore';
 import { useThemeColors } from '../theme';
 import apiClient from '../api/client';
 
-export const GlobalHeader = ({ onNavigate, onOpenDrawer }) => {
+export const GlobalHeader = ({ onNavigate }) => {
   const { user, logout, refreshAccessToken } = useAuthStore();
   const { language, setLanguage } = useThemeStore();
   const { colors, isDarkMode } = useThemeColors();
@@ -22,26 +22,27 @@ export const GlobalHeader = ({ onNavigate, onOpenDrawer }) => {
   const [langMenuVisible, setLangMenuVisible] = useState(false);
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
 
-  // Fetch unread notifications count from backend
+  // Fetch unread notifications count from backend (Exact Web Match: GET /notifications)
   useEffect(() => {
     let isMounted = true;
     const fetchNotifications = async () => {
       try {
-        const res = await apiClient.get('/portal/notifications', logout, refreshAccessToken);
+        const query = user?.role === 'Tenant' ? '?role=Tenant' : '';
+        const res = await apiClient.get(`/notifications${query}`, logout, refreshAccessToken).catch(() => null);
         const data = res?.data || res || [];
         if (Array.isArray(data) && isMounted) {
           const unread = data.filter((n) => !n.read && !n.isRead).length;
-          setUnreadCount(unread > 0 ? unread : (data.length > 0 ? data.length : 3));
+          setUnreadCount(unread);
         }
       } catch (e) {
-        if (isMounted) setUnreadCount(3);
+        if (isMounted) setUnreadCount(0);
       }
     };
     fetchNotifications();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user?.role]);
 
   const displayName = user?.firstName
     ? `${user.firstName} ${user.lastName || ''}`.trim()
@@ -307,7 +308,7 @@ const getStyles = (colors, isDarkMode) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       height: 48,
-      paddingHorizontal: 12,
+      paddingHorizontal: 16,
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: isDarkMode ? '#1e293b' : '#e2e8f0',

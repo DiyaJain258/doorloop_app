@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore, useThemeStore } from './store/useStore';
 import { Ionicons } from '@expo/vector-icons';
 
+LogBox.ignoreLogs([
+  'Cannot connect to Expo CLI.',
+  'Cannot connect to Expo CLI',
+  'Non-serializable values were found in the navigation state',
+]);
+
 import { SplashScreen } from './components/SplashScreen';
 import { LoginScreen } from './screens/LoginScreen';
-import { NavigationDrawer } from './components/NavigationDrawer';
 import { GlobalHeader } from './components/GlobalHeader';
 
 import { AdminDashboard } from './screens/AdminDashboard';
@@ -34,12 +39,12 @@ import { TenantDocumentsScreen } from './screens/TenantDocumentsScreen';
 import { StatementsScreen } from './screens/StatementsScreen';
 import { DistributionsScreen } from './screens/DistributionsScreen';
 import { ReportsScreen } from './screens/ReportsScreen';
-import { OwnerReportsScreen } from './screens/OwnerReportsScreen';
 import { InvoicesScreen } from './screens/InvoicesScreen';
 import { TenantLedgerScreen } from './screens/TenantLedgerScreen';
 import { TenantServicesScreen } from './screens/TenantServicesScreen';
 import { OwnerFinancialsScreen } from './screens/OwnerFinancialsScreen';
 import { OwnerMaintenanceScreen } from './screens/OwnerMaintenanceScreen';
+import { OwnerReportsScreen } from './screens/OwnerReportsScreen';
 import { OwnerServicesScreen } from './screens/OwnerServicesScreen';
 import { ManagerServicesScreen } from './screens/ManagerServicesScreen';
 import { IntegrationsScreen } from './screens/IntegrationsScreen';
@@ -61,7 +66,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeSubTab, setActiveSubTab] = useState(null);
   const [currentInspectionId, setCurrentInspectionId] = useState(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
 
   const handleNavigate = (tabId, paramsOrSubTab) => {
     let subTab = typeof paramsOrSubTab === 'string' ? paramsOrSubTab : paramsOrSubTab?.tab || null;
@@ -117,7 +121,7 @@ export default function App() {
 
       case 'accounting':
         setActiveTab('accounting');
-        setActiveSubTab(subTab || 'coa');
+        setActiveSubTab(subTab || 'dashboard');
         break;
 
       case 'requests':
@@ -131,7 +135,7 @@ export default function App() {
 
       case 'maintenance':
         setActiveTab('maintenance');
-        setActiveSubTab(subTab === 'vendors' || subTab === 'vendor' ? 'staff' : (subTab || 'dashboard'));
+        setActiveSubTab(subTab || 'requests');
         break;
 
       case 'admin':
@@ -145,7 +149,9 @@ export default function App() {
       case 'integrations':
       case 'connected':
         setActiveTab('company-settings');
-        setActiveSubTab(subTab || (tabId === 'admin' ? 'profile' : tabId));
+        setActiveSubTab(
+          subTab || (tabId === 'admin' || tabId === 'company-settings' ? 'profile' : tabId)
+        );
         break;
 
       default:
@@ -336,7 +342,7 @@ export default function App() {
       case 'owners':
         return <OwnersScreen />;
       case 'documents':
-        return <TenantDocumentsScreen />;
+        return <TenantDocumentsScreen initialTab={activeSubTab || 'tenant'} onNavigate={handleNavigate} />;
       case 'invoices':
         if (role === 'Property Manager' || role === 'Collection Manager') {
           return <ManagerRentPaymentsScreen initialTab="invoices" />;
@@ -346,14 +352,11 @@ export default function App() {
       case 'messages':
         return role === 'Property Manager' ? <ManagerCommunicationScreen /> : <TenantMessagesScreen />;
       case 'notifications':
-        return <TenantNotificationsScreen />;
+        return <TenantNotificationsScreen onNavigate={handleNavigate} />;
       case 'statements':
         return <StatementsScreen />;
       case 'reports':
-        if (role === 'Owner') {
-          return <OwnerReportsScreen onNavigate={handleNavigate} />;
-        }
-        return <ReportsScreen />;
+        return role === 'Owner' ? <OwnerReportsScreen /> : <ReportsScreen />;
       case 'rent':
       case 'payments':
       case 'rent-dashboard':
@@ -376,7 +379,7 @@ export default function App() {
       case 'expenses':
         if (role === 'Owner') return <OwnerFinancialsScreen />;
         if (role === 'Property Manager' || role === 'Collection Manager') {
-          return <ManagerAccountingScreen initialTab={activeSubTab || 'coa'} />;
+          return <ManagerAccountingScreen initialTab={activeSubTab || 'dashboard'} onNavigate={handleNavigate} />;
         }
         return <TenantLedgerScreen />;
       case 'maintenance':
@@ -452,11 +455,7 @@ export default function App() {
   };
 
   const handleTabPress = (tabId) => {
-    if (tabId === 'more' && role !== 'Tenant' && role !== 'Owner' && role !== 'Property Manager') {
-      setDrawerVisible(true);
-    } else {
-      handleNavigate(tabId);
-    }
+    handleNavigate(tabId);
   };
 
   const isDarkMode = theme === 'dark';
@@ -467,17 +466,7 @@ export default function App() {
 
       {/* Top-Bar & Global Header Controls (Theme, Language EN/ES/HI, Notifications, Profile Pill) */}
       <GlobalHeader
-        onOpenDrawer={() => setDrawerVisible(true)}
         onNavigate={handleNavigate}
-      />
-
-      {/* 14 Menus Navigation Drawer Component */}
-      <NavigationDrawer
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        activeScreen={activeTab}
-        activeTab={activeSubTab}
-        onSelectScreen={(screenId, subTab) => handleNavigate(screenId, subTab)}
       />
 
       {/* Main Screen Content */}
@@ -599,9 +588,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingHorizontal: 2,
-    width: '100%',
-    maxWidth: 640,
-    alignSelf: 'center',
   },
   bottomTabItem: {
     flex: 1,

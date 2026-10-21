@@ -109,8 +109,37 @@ export const setAuthToken = (token) => {
   currentAuthToken = token;
 };
 
+export const normalizeUrl = (url) => {
+  if (!url || typeof url !== 'string') return url;
+  const [pathname, query] = url.split('?');
+  const queryStr = query ? `?${query}` : '';
+
+  // 1. CRM Leads (Live backend mounts at /portal/crm/leads)
+  if (pathname === '/crm/leads' || pathname === '/leads') {
+    return `/portal/crm/leads${queryStr}`;
+  }
+
+  // 2. Notifications (Live backend mounts at /notifications)
+  if (pathname === '/portal/notifications') {
+    return `/notifications${queryStr}`;
+  }
+
+  // 3. Work Orders (Live backend mounts at /work-orders)
+  if (pathname === '/portal/work-orders') {
+    return `/work-orders${queryStr}`;
+  }
+
+  // 4. Leases (Live backend mounts at /leases)
+  if (pathname === '/leasing/leases') {
+    return `/leases${queryStr}`;
+  }
+
+  return url;
+};
+
 export const apiClient = {
   setAuthToken,
+  normalizeUrl,
 
   getToken: async () => {
     try {
@@ -159,7 +188,8 @@ export const apiClient = {
     };
   },
 
-  get: async (url, logoutFn, refreshFn) => {
+  get: async (rawUrl, logoutFn, refreshFn) => {
+    const url = normalizeUrl(rawUrl);
     try {
       const headers = await apiClient.getHeaders();
       let response = await fetch(`${BASE_URL}${url}`, {
@@ -178,17 +208,47 @@ export const apiClient = {
         }
       }
 
+      // If 404, attempt transparent fallback before failing
+      if (response.status === 404) {
+        let fallbackUrl = null;
+        if (url.startsWith('/portal/crm/leads')) {
+          fallbackUrl = '/applications';
+        } else if (url.startsWith('/notifications')) {
+          fallbackUrl = '/portal/tenant/notifications';
+        } else if (url.startsWith('/work-orders')) {
+          fallbackUrl = '/portal/tenant/maintenance';
+        } else if (url.startsWith('/leases')) {
+          fallbackUrl = '/portal/tenant/leases';
+        }
+
+        if (fallbackUrl) {
+          try {
+            const fallbackHeaders = await apiClient.getHeaders();
+            const fallbackRes = await fetch(`${BASE_URL}${fallbackUrl}`, {
+              method: 'GET',
+              headers: fallbackHeaders,
+            });
+            if (fallbackRes.ok) {
+              return await fallbackRes.json();
+            }
+          } catch (fallbackErr) {
+            // proceed to standard response handling
+          }
+        }
+      }
+
       if (!response.ok) {
         await handleResponseError(response);
       }
       return await response.json();
     } catch (e) {
-      console.log(`GET ${url} error:`, e.message);
+      console.log(`GET ${rawUrl} error:`, e.message);
       throw e;
     }
   },
 
-  post: async (url, data, logoutFn, refreshFn) => {
+  post: async (rawUrl, data, logoutFn, refreshFn) => {
+    const url = normalizeUrl(rawUrl);
     try {
       const isFormData = data instanceof FormData;
       const headers = isFormData ? await apiClient.getAuthHeaders() : await apiClient.getHeaders();
@@ -216,12 +276,13 @@ export const apiClient = {
       }
       return await response.json();
     } catch (e) {
-      console.log(`POST ${url} error:`, e.message);
+      console.log(`POST ${rawUrl} error:`, e.message);
       throw e;
     }
   },
 
-  put: async (url, data, logoutFn, refreshFn) => {
+  put: async (rawUrl, data, logoutFn, refreshFn) => {
+    const url = normalizeUrl(rawUrl);
     try {
       const isFormData = data instanceof FormData;
       const headers = isFormData ? await apiClient.getAuthHeaders() : await apiClient.getHeaders();
@@ -249,12 +310,13 @@ export const apiClient = {
       }
       return await response.json();
     } catch (e) {
-      console.log(`PUT ${url} error:`, e.message);
+      console.log(`PUT ${rawUrl} error:`, e.message);
       throw e;
     }
   },
 
-  delete: async (url, logoutFn, refreshFn) => {
+  delete: async (rawUrl, logoutFn, refreshFn) => {
+    const url = normalizeUrl(rawUrl);
     try {
       const headers = await apiClient.getHeaders();
       let response = await fetch(`${BASE_URL}${url}`, {
@@ -278,7 +340,7 @@ export const apiClient = {
       }
       return await response.json();
     } catch (e) {
-      console.log(`DELETE ${url} error:`, e.message);
+      console.log(`DELETE ${rawUrl} error:`, e.message);
       throw e;
     }
   },
