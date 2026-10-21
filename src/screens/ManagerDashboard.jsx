@@ -48,11 +48,11 @@ export const ManagerDashboard = ({ onNavigate }) => {
       const [propsRes, unitsRes, paymentsRes, reqRes, woRes, expensesRes, leasesRes] = await Promise.all([
         apiClient.get('/properties', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/units', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/portal/payments', logout, refreshAccessToken).catch(() => apiClient.get('/payments', logout, refreshAccessToken).catch(() => null)),
-        apiClient.get('/portal/maintenance/requests', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/portal/work-orders', logout, refreshAccessToken).catch(() => apiClient.get('/work-orders', logout, refreshAccessToken).catch(() => null)),
-        apiClient.get('/portal/expenses', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/leasing/leases', logout, refreshAccessToken).catch(() => apiClient.get('/leases', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/payments', logout, refreshAccessToken).catch(() => apiClient.get('/portal/payments', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/work-orders', logout, refreshAccessToken).catch(() => apiClient.get('/portal/work-orders', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/maintenance/requests', logout, refreshAccessToken).catch(() => apiClient.get('/portal/maintenance/requests', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/expenses', logout, refreshAccessToken).catch(() => apiClient.get('/portal/expenses', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/leases', logout, refreshAccessToken).catch(() => apiClient.get('/leasing/leases', logout, refreshAccessToken).catch(() => null)),
       ]);
 
       const rawProps = propsRes?.data || propsRes || [];

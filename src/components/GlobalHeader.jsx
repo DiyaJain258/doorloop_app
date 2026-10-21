@@ -27,7 +27,7 @@ export const GlobalHeader = ({ onNavigate, onOpenDrawer }) => {
     let isMounted = true;
     const fetchNotifications = async () => {
       try {
-        const res = await apiClient.get('/portal/notifications', logout, refreshAccessToken);
+        const res = await apiClient.get('/notifications', logout, refreshAccessToken).catch(() => apiClient.get('/portal/notifications', logout, refreshAccessToken).catch(() => null));
         const data = res?.data || res || [];
         if (Array.isArray(data) && isMounted) {
           const unread = data.filter((n) => !n.read && !n.isRead).length;

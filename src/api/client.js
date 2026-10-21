@@ -183,7 +183,7 @@ export const apiClient = {
       }
       return await response.json();
     } catch (e) {
-      console.log(`GET ${url} error:`, e.message);
+      console.debug(`[API] GET ${url}:`, e.message);
       throw e;
     }
   },
