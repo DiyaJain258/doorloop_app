@@ -76,7 +76,7 @@ export const ManagerDashboard = ({ onNavigate }) => {
         apiClient.get('/leases', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/properties', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/units', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/portal/expenses', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/expenses', logout, refreshAccessToken).catch(() => apiClient.get('/portal/expenses', logout, refreshAccessToken).catch(() => null)),
       ]);
 
       // 1. Process Live Properties & Units

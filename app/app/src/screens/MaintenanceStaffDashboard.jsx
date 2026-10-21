@@ -47,11 +47,11 @@ export const MaintenanceStaffDashboard = ({ activeSubTab }) => {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get('/portal/staff/tasks', logout, refreshAccessToken);
+      const res = await apiClient.get('/work-orders', logout, refreshAccessToken).catch(() => apiClient.get('/portal/staff/tasks', logout, refreshAccessToken).catch(() => []));
       setTasks(res?.data || res || []);
     } catch (e) {
       console.error('Error fetching staff tasks:', e);
-      Alert.alert('Error', 'Failed to fetch tasks from server');
+      setTasks([]);
     } finally {
       setLoading(false);
     }

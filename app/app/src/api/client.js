@@ -242,7 +242,7 @@ export const apiClient = {
       }
       return await response.json();
     } catch (e) {
-      console.log(`GET ${rawUrl} error:`, e.message);
+      console.debug(`[API] GET ${rawUrl}:`, e.message);
       throw e;
     }
   },

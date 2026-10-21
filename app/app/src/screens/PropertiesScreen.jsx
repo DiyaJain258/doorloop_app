@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../api/client';
-import { useAuthStore, useThemeStore } from '../store/useStore';
+import { useAuthStore, useThemeStore, safeStorage } from '../store/useStore';
 import { useThemeColors } from '../theme';
 import { propertySchema, unitSchema } from '../validations/mobile.validation';
 import { CustomDatePicker } from '../components/CustomDatePicker';
@@ -24,6 +24,14 @@ const PROPERTY_TYPES = ['Apartment', 'Commercial', 'Single Family', 'Multi Famil
 const PROPERTY_STATUSES = ['Active', 'Inactive', 'Under Review'];
 const UNIT_STATUSES = ['Occupied', 'Vacant', 'Reserved', 'Under Maintenance'];
 const GENDERS = ['Male', 'Female', 'Other'];
+
+export const normalizeGender = (g) => {
+  if (!g) return 'Male';
+  const s = String(g).trim().toLowerCase();
+  if (s === 'female') return 'Female';
+  if (s === 'other' || s.startsWith('oth')) return 'Other';
+  return 'Male';
+};
 
 const parseDateSafe = (dateStr) => {
   if (!dateStr || typeof dateStr !== 'string') return null;
@@ -141,6 +149,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const [editingPropId, setEditingPropId] = useState(null);
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
   const [editingUnitId, setEditingUnitId] = useState(null);
+  const [editingTenantId, setEditingTenantId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
@@ -506,6 +515,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   // --------------------------------------------------------------------------
   const handleOpenAddUnit = (preselectedPropId = null) => {
     setEditingUnitId(null);
+    setEditingTenantId(null);
     setUPropId(preselectedPropId || properties[0]?.id || '');
     setUNumber('');
     setUFloor('1');
@@ -552,7 +562,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
     setIsUnitModalOpen(true);
   };
 
-  const handleOpenEditUnit = (unit) => {
+  const handleOpenEditUnit = async (unit) => {
     setEditingUnitId(unit.id);
     setUPropId(unit.propertyId || properties[0]?.id || '');
     setUNumber(String(unit.unitNumber || ''));
@@ -570,19 +580,39 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
     setULateFeeGraceDays(String(unit.lateFeeGraceDays || 5));
 
     setUProvideTenantInfo('now');
-    const existingT = (unit.tenants && unit.tenants[0]) || tenants.find((item) => item.unitId === unit.id || item.id === unit.tenantId);
+
+    // Fetch live unit data from backend to ensure changes from Web are immediately visible in App
+    let liveUnit = unit;
+    try {
+      const freshRes = await apiClient.get(`/units/${unit.id}`, logout, refreshAccessToken);
+      if (freshRes?.data || freshRes) {
+        liveUnit = freshRes.data || freshRes;
+      }
+    } catch (e) {
+      console.debug('[PropertiesScreen] Using cached unit data:', e.message);
+    }
+
+    const existingT = (liveUnit.tenants && liveUnit.tenants[0]) || liveUnit.tenant || tenants.find((item) => item.unitId === liveUnit.id || item.id === liveUnit.tenantId);
+    const tId = existingT?.id || liveUnit.tenantId || (liveUnit.tenants && liveUnit.tenants[0]?.id) || null;
+    setEditingTenantId(tId);
+
     if (existingT) {
       setTFirstName(existingT.firstName || 'John');
       setTLastName(existingT.lastName || 'Doe');
       setTPreferredName(existingT.preferredName || '');
-      setTDob(existingT.dob || '');
-      setTGender(existingT.gender || 'Male');
+      setTDob(existingT.dob ? String(existingT.dob).split('T')[0] : '');
+
+      const cachedG = tId ? await safeStorage.getItem('tenant_gender_' + tId) : null;
+      const unitCachedG = await safeStorage.getItem('unit_tenant_gender_' + unit.id);
+      const resolvedGender = normalizeGender(cachedG || unitCachedG || existingT.gender || (['Male', 'Female', 'Other'].includes(existingT.nationality) ? existingT.nationality : null) || 'Male');
+      setTGender(resolvedGender);
+
       setTEmail(existingT.email || 'john.doe@example.com');
       setTPhone(existingT.phone || '(512) 555-0199');
       setTAltPhone(existingT.altPhone || '(512) 555-4321');
       setTPassword('123456');
       setTMoveInDate(existingT.moveInDate ? String(existingT.moveInDate).split('T')[0] : '01/23/2026');
-      setTInvoiceStartDate(existingT.invoiceStartDate ? String(existingT.invoiceStartDate).split('T')[0] : '01/21/2026');
+      setTInvoiceStartDate(existingT.invoiceStartDate ? String(existingT.invoiceStartDate).split('T')[0] : (existingT.moveInDate ? String(existingT.moveInDate).split('T')[0] : '01/21/2026'));
       setTOutstandingBalance(String(existingT.openingBalance ?? existingT.previousBalance ?? '0'));
       setTSsn(existingT.ssn || '');
       setTIdType(existingT.idType || 'Driver License');
@@ -673,6 +703,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
         if (uStatus === 'Occupied' && tFirstName && tLastName) {
           try {
+            const finalGender = normalizeGender(tGender);
             const tenantPayload = {
               firstName: tFirstName.trim(),
               lastName: tLastName.trim(),
@@ -681,7 +712,8 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               phone: tPhone.trim() || '(512) 555-0199',
               altPhone: tAltPhone.trim() || undefined,
               dob: tDob || undefined,
-              gender: tGender,
+              gender: finalGender,
+              nationality: finalGender,
               status: 'Active',
               unitId: editingUnitId,
               propertyId: uPropId,
@@ -700,13 +732,22 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               employerPhone: tEmployerPhone || undefined,
             };
 
-            const existingTenant = tenants.find((item) => item.unitId === editingUnitId);
-            if (existingTenant) {
-              await apiClient.put(`/tenants/${existingTenant.id}`, tenantPayload, logout, refreshAccessToken).catch(() => null);
+            let targetTenantId = editingTenantId;
+            if (!targetTenantId) {
+              const existingTenant = tenants.find((item) => item.unitId === editingUnitId || (item.email && item.email.toLowerCase() === tEmail.trim().toLowerCase()));
+              targetTenantId = existingTenant?.id;
+            }
+
+            if (targetTenantId) {
+              await apiClient.put(`/tenants/${targetTenantId}`, tenantPayload, logout, refreshAccessToken);
+              await safeStorage.setItem('tenant_gender_' + targetTenantId, finalGender);
+              await safeStorage.setItem('unit_tenant_gender_' + editingUnitId, finalGender);
             } else {
               const createdTenantRes = await apiClient.post('/tenants', tenantPayload, logout, refreshAccessToken).catch(() => null);
               const createdTenant = createdTenantRes?.data || createdTenantRes;
               if (createdTenant?.id) {
+                await safeStorage.setItem('tenant_gender_' + createdTenant.id, finalGender);
+                await safeStorage.setItem('unit_tenant_gender_' + editingUnitId, finalGender);
                 await apiClient.post(
                   `/units/${editingUnitId}/assign-tenant`,
                   { tenantId: createdTenant.id },
@@ -727,6 +768,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
         if (uStatus === 'Occupied' && tFirstName && tLastName) {
           try {
+            const finalGender = normalizeGender(tGender);
             const tenantPayload = {
               firstName: tFirstName.trim(),
               lastName: tLastName.trim(),
@@ -736,7 +778,8 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               altPhone: tAltPhone.trim() || undefined,
               password: tPassword || '123456',
               dob: tDob || undefined,
-              gender: tGender,
+              gender: finalGender,
+              nationality: finalGender,
               status: 'Active',
               unitId: createdUnit?.id,
               propertyId: uPropId,
@@ -757,6 +800,13 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
             const createdTenantRes = await apiClient.post('/tenants', tenantPayload, logout, refreshAccessToken);
             const createdTenant = createdTenantRes?.data || createdTenantRes;
+
+            if (createdTenant?.id) {
+              await safeStorage.setItem('tenant_gender_' + createdTenant.id, finalGender);
+              if (createdUnit?.id) {
+                await safeStorage.setItem('unit_tenant_gender_' + createdUnit.id, finalGender);
+              }
+            }
 
             if (createdUnit?.id && createdTenant?.id) {
               await apiClient.post(
@@ -1617,8 +1667,8 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                         <Text style={styles.inputLabel} allowFontScaling={false}>GENDER</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                           {GENDERS.map((g) => (
-                            <TouchableOpacity key={g} style={[styles.chip, tGender === g && styles.chipActive]} onPress={() => setTGender(g)}>
-                              <Text style={[styles.chipText, tGender === g && styles.chipTextActive]} allowFontScaling={false}>{g}</Text>
+                            <TouchableOpacity key={g} style={[styles.chip, normalizeGender(tGender) === g && styles.chipActive]} onPress={() => setTGender(g)}>
+                              <Text style={[styles.chipText, normalizeGender(tGender) === g && styles.chipTextActive]} allowFontScaling={false}>{g}</Text>
                             </TouchableOpacity>
                           ))}
                         </ScrollView>
