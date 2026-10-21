@@ -11,7 +11,7 @@ LogBox.ignoreLogs([
   'AsyncStorage has been extracted',
 ]);
 
-if (__DEV__) {
+if (typeof __DEV__ !== 'undefined' && __DEV__) {
   const originalWarn = console.warn;
   console.warn = (...args) => {
     if (
