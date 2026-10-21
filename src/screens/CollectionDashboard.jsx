@@ -12,7 +12,7 @@ import {
   Easing,
 } from 'react-native';
 import apiClient from '../api/client';
-import { useAuthStore } from '../store/useStore';
+import { useAuthStore, useThemeStore } from '../store/useStore';
 import { useThemeColors } from '../theme';
 
 // Animated Touchable Wrapper Component
