@@ -53,19 +53,23 @@ export const GlobalHeader = ({ onNavigate }) => {
   const displayRole = user?.role || 'Property Manager';
   const initialLetter = (displayName.charAt(0) || 'U').toUpperCase();
 
+  useEffect(() => {
+    if (language !== 'en' && language !== 'es') {
+      setLanguage('en');
+    }
+  }, [language]);
+
   const handleLogout = () => {
     setProfileMenuVisible(false);
     Alert.alert(
-      language === 'es' ? 'Cerrar Sesión' : language === 'hi' ? 'लॉग आउट' : 'Log Out',
+      language === 'es' ? 'Cerrar Sesión' : 'Log Out',
       language === 'es'
         ? '¿Estás seguro de que deseas salir?'
-        : language === 'hi'
-        ? 'क्या आप सच में लॉग आउट करना चाहते हैं?'
         : 'Are you sure you want to log out?',
       [
-        { text: language === 'es' ? 'Cancelar' : language === 'hi' ? 'रद्द करें' : 'Cancel', style: 'cancel' },
+        { text: language === 'es' ? 'Cancelar' : 'Cancel', style: 'cancel' },
         {
-          text: language === 'es' ? 'Salir' : language === 'hi' ? 'लॉग आउट' : 'Log Out',
+          text: language === 'es' ? 'Salir' : 'Log Out',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -81,7 +85,6 @@ export const GlobalHeader = ({ onNavigate }) => {
   const languages = [
     { code: 'en', label: 'English', short: 'EN', flag: '🇺🇸' },
     { code: 'es', label: 'Español', short: 'ES', flag: '🇪🇸' },
-    { code: 'hi', label: 'हिन्दी', short: 'HI', flag: '🇮🇳' },
   ];
 
   const currentLangObj = languages.find((l) => l.code === language) || languages[0];
@@ -166,10 +169,10 @@ export const GlobalHeader = ({ onNavigate }) => {
           <View style={styles.bottomSheetContent}>
             <View style={styles.sheetHandle} />
             <Text style={styles.modalHeaderTitle}>
-              {language === 'es' ? 'Seleccionar Idioma' : language === 'hi' ? 'भाषा चुनें' : 'Select Language'}
+              {language === 'es' ? 'Seleccionar Idioma' : 'Select Language'}
             </Text>
             <Text style={styles.modalSubTitle}>
-              {language === 'es' ? 'Elige tu idioma preferido para la app' : language === 'hi' ? 'ऐप के लिए अपनी पसंदीदा भाषा चुनें' : 'Choose your preferred language for the app'}
+              {language === 'es' ? 'Elige tu idioma preferido para la app' : 'Choose your preferred language for the app'}
             </Text>
 
             <View style={styles.langListContainer}>
