@@ -42,6 +42,8 @@ export const TenantDashboard = ({ onNavigate }) => {
 
   const [screeningReport, setScreeningReport] = useState(null);
   const [latestNotice, setLatestNotice] = useState(null);
+  const [recentTicket, setRecentTicket] = useState(null);
+  const [noticeModalVisible, setNoticeModalVisible] = useState(false);
 
   // Modals
   const [payModalVisible, setPayModalVisible] = useState(false);
@@ -59,30 +61,50 @@ export const TenantDashboard = ({ onNavigate }) => {
   const [docFile, setDocFile] = useState(null);
   const [consent, setConsent] = useState(false);
 
-  // Fetch live data matching Web APIs:
-  // 1. GET /portal/tenant/metrics
-  // 2. GET /portal/tenant/leases
-  // 3. GET /portal/tenant/profile
-  // 4. GET /portal/screening/reports
-  // 5. GET /portal/tenant/notifications
+  // Notice Parsers
+  const getNoticeSubject = (notice) => {
+    if (!notice) return 'Management Notice';
+    if (notice.title) return notice.title;
+    const msg = String(notice.message || '');
+    if (msg.startsWith('Subject:')) {
+      const endLine = msg.indexOf('\n');
+      return endLine > -1 ? msg.substring(8, endLine).trim() : msg.substring(8).trim();
+    }
+    return 'Urgent Rent Payment Reminder';
+  };
+
+  const getNoticeShortPreview = (notice) => {
+    if (!notice) return '';
+    const msg = String(notice.message || '');
+    const clean = msg.replace(/^Subject:.*\n*/i, '').trim();
+    const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+    const bodyLine = lines.find(l => !l.toLowerCase().startsWith('dear') && !l.toLowerCase().startsWith('best'));
+    return bodyLine || lines[0] || 'Click to view notice details';
+  };
+
+  // Fetch live data matching Web APIs
   const fetchTenantPortalData = async () => {
     try {
       setLoading(true);
-      const [metricsRes, leasesRes, profileRes, screeningRes, notifsRes] = await Promise.all([
+      const [metricsRes, leaseRes, leasesRes, profileRes, screeningRes, notifsRes, maintenanceRes] = await Promise.all([
         apiClient.get('/portal/tenant/metrics', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/leases', logout, refreshAccessToken).catch(() => apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/portal/tenant/lease', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => apiClient.get('/leases', logout, refreshAccessToken).catch(() => null)),
         apiClient.get('/portal/tenant/profile', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/screening/reports', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/tenant/notifications', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/portal/tenant/maintenance', logout, refreshAccessToken).catch(() => null),
       ]);
 
       const metrics = metricsRes?.data || metricsRes || {};
-      const leases = leasesRes?.data || leasesRes || [];
+      const singleLease = leaseRes?.data || leaseRes || null;
+      const allLeases = leasesRes?.data || leasesRes || [];
       const profile = profileRes?.data || profileRes || {};
       const reports = screeningRes?.data || screeningRes || [];
       const notifs = notifsRes?.data || notifsRes || [];
+      const maintenance = maintenanceRes?.data || maintenanceRes || [];
 
-      const lease = leases.length > 0 ? leases[0] : null;
+      const lease = singleLease || (Array.isArray(allLeases) && allLeases.length > 0 ? allLeases[0] : null);
       const propName = lease?.property?.name || lease?.propertyName || profile?.companyName || (lease ? 'Property' : 'No Active Lease');
       const unitNum = lease?.unit?.unitNumber || lease?.unitNumber || profile?.unitNumber || (lease ? 'Unit' : 'N/A');
 
@@ -100,7 +122,16 @@ export const TenantDashboard = ({ onNavigate }) => {
       // Check for unread management notices
       if (Array.isArray(notifs) && notifs.length > 0) {
         const unread = notifs.find((n) => !n.read && !n.isRead);
-        setLatestNotice(unread || null);
+        setLatestNotice(unread || notifs[0] || null);
+      } else {
+        setLatestNotice(null);
+      }
+
+      // Check for recent maintenance ticket
+      if (Array.isArray(maintenance) && maintenance.length > 0) {
+        setRecentTicket(maintenance[0]);
+      } else {
+        setRecentTicket(null);
       }
 
       const rentAmount = Number(metrics.currentRent || metrics.currentRentDue || lease?.rentAmount || 0);
@@ -115,8 +146,8 @@ export const TenantDashboard = ({ onNavigate }) => {
         unitNumber: unitNum,
         currentRent: rentAmount,
         outstandingBalance: outBal,
-        nextDueDate: metrics.nextDueDate || (lease ? '1st of next month' : 'N/A'),
-        leaseExpiration: metrics.leaseExpiration || (lease?.endDate ? lease.endDate.split('T')[0] : 'N/A'),
+        nextDueDate: metrics.nextDueDate && metrics.nextDueDate !== 'N/A' ? String(metrics.nextDueDate).split('T')[0] : (lease ? '1st of next month' : 'N/A'),
+        leaseExpiration: metrics.leaseExpiration || (lease?.endDate ? String(lease.endDate).split('T')[0] : 'N/A'),
         activeVisitors: Number(metrics.activeVisitors || 0),
         packagesWaiting: Number(metrics.packagesWaiting || 0),
       });
@@ -270,7 +301,8 @@ export const TenantDashboard = ({ onNavigate }) => {
     );
   }
 
-  const isPaidInFull = tenantData.outstandingBalance <= 0;
+  const amountToPay = tenantData.outstandingBalance > 0 ? tenantData.outstandingBalance : tenantData.currentRent;
+  const isOverdue = tenantData.outstandingBalance > 0;
 
   return (
     <ScrollView
@@ -279,39 +311,48 @@ export const TenantDashboard = ({ onNavigate }) => {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#38bdf8" />}
     >
-      {/* Welcome Banner */}
+      {/* Welcome Header */}
       <View style={styles.welcomeSection}>
         <Text style={[styles.welcomeGreeting, { color: colors.textPrimary }]} allowFontScaling={false}>
           Hello, {tenantData.name} 👋
         </Text>
-        <Text style={[styles.welcomeLocation, { color: colors.textSecondary }]} allowFontScaling={false}>
-          📍 {tenantData.propertyName} · Unit {tenantData.unitNumber}
-        </Text>
+        <View style={styles.unitLocationRow}>
+          <Ionicons name="location-sharp" size={13} color="#38bdf8" style={{ marginRight: 4 }} />
+          <Text style={[styles.welcomeLocation, { color: colors.textSecondary }]} allowFontScaling={false}>
+            {tenantData.propertyName} {tenantData.unitNumber && tenantData.unitNumber !== 'N/A' ? `· Unit ${tenantData.unitNumber}` : ''}
+          </Text>
+        </View>
       </View>
 
-      {/* Management Notice / Alert Banner */}
+      {/* Compact Management Notice Strip (1-Line Only, Click to Read) */}
       {latestNotice && (
-        <View style={[styles.alertBanner, { backgroundColor: 'rgba(99, 102, 241, 0.1)', borderColor: 'rgba(99, 102, 241, 0.3)' }]}>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              <Ionicons name="sparkles" size={14} color="#6366f1" style={{ marginRight: 6 }} />
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#6366f1', textTransform: 'uppercase' }}>
-                Management Notice
+        <TouchableOpacity
+          style={[styles.noticeStrip, { backgroundColor: colors.card, borderColor: 'rgba(245, 158, 11, 0.35)' }]}
+          onPress={() => setNoticeModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.noticeIconWrapper}>
+            <Ionicons name="notifications" size={16} color="#f59e0b" />
+          </View>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.noticeStripBadge}>NOTICE</Text>
+              <Text style={[styles.noticeStripTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                {getNoticeSubject(latestNotice)}
               </Text>
             </View>
-            <Text style={[styles.alertMessage, { color: colors.textPrimary }]}>{latestNotice.message || latestNotice.title}</Text>
+            <Text style={[styles.noticeStripPreview, { color: colors.textSecondary }]} numberOfLines={1}>
+              {getNoticeShortPreview(latestNotice)}
+            </Text>
           </View>
-          <TouchableOpacity
-            style={styles.alertActionBtn}
-            onPress={() => setPayModalVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.alertActionBtnText}>Pay Now</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.noticeReadPill}>
+            <Text style={styles.noticeReadText}>Read</Text>
+            <Ionicons name="chevron-forward" size={12} color="#38bdf8" />
+          </View>
+        </TouchableOpacity>
       )}
 
-      {/* Screening Pending Alert */}
+      {/* Screening Verification Banner (If pending) */}
       {screeningReport &&
         (screeningReport.status === 'Pending Documents' || screeningReport.status === 'Pending Consent') && (
           <TouchableOpacity
@@ -319,201 +360,229 @@ export const TenantDashboard = ({ onNavigate }) => {
             onPress={() => setScreeningModalOpen(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="alert-circle" size={20} color="#ef4444" style={{ marginRight: 10 }} />
+            <Ionicons name="alert-circle" size={18} color="#ef4444" style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: '#ef4444' }}>Verification Required</Text>
               <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-                Please upload your ID/W2 proof to complete tenant screening.
+                Upload ID/W2 proof to complete tenant screening.
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#ef4444" />
+            <Ionicons name="chevron-forward" size={16} color="#ef4444" />
           </TouchableOpacity>
         )}
 
       {/* =========================================================================
-          CARD 1: CURRENT RENT DUE (Clean DoorLoop Minimalist Card)
+          TOP HERO: TOTAL AMOUNT DUE & 1-TAP PAY BUTTON
           ========================================================================= */}
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-        <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: colors.textPrimary }]} allowFontScaling={false}>
-            Current rent due
+      <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+        <View style={styles.heroHeaderRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={[styles.heroDot, { backgroundColor: isOverdue ? '#ef4444' : (amountToPay > 0 ? '#f59e0b' : '#10b981') }]} />
+            <Text style={[styles.heroCardLabel, { color: colors.textSecondary }]} allowFontScaling={false}>
+              TOTAL AMOUNT DUE
+            </Text>
+          </View>
+
+          <View style={[styles.heroStatusBadge, { 
+            backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.15)' : (amountToPay > 0 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)') 
+          }]}>
+            <Text style={[styles.heroStatusText, { 
+              color: isOverdue ? '#ef4444' : (amountToPay > 0 ? '#f59e0b' : '#10b981') 
+            }]} allowFontScaling={false}>
+              {isOverdue ? 'Overdue' : (amountToPay > 0 ? 'Due Soon' : 'Paid in Full')}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.heroAmountRow}>
+          <Text style={[styles.heroAmountText, { color: isOverdue ? '#ef4444' : (amountToPay > 0 ? colors.textPrimary : '#10b981') }]} allowFontScaling={false}>
+            ${amountToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </Text>
         </View>
 
-        <View style={styles.cardBodyPadding}>
-          <Text style={[styles.bigAmount, { color: colors.textPrimary }]} allowFontScaling={false}>
-            ${tenantData.currentRent.toLocaleString()}
+        <Text style={[styles.heroDueDateText, { color: colors.textSecondary }]} allowFontScaling={false}>
+          {amountToPay > 0 
+            ? (isOverdue 
+                ? `Due Date: ${tenantData.nextDueDate !== 'N/A' ? tenantData.nextDueDate : 'Immediate'} · Outstanding balance pending`
+                : `Due Date: ${tenantData.nextDueDate}`)
+            : 'No pending charges · Thank you for paying on time! 🎉'}
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.heroPayBtn, { backgroundColor: amountToPay > 0 ? '#0284c7' : '#10b981' }]}
+          onPress={() => setPayModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name={amountToPay > 0 ? "card" : "checkmark-circle"} size={18} color="#ffffff" style={{ marginRight: 8 }} />
+          <Text style={styles.heroPayBtnText} allowFontScaling={false}>
+            {amountToPay > 0 ? `Pay $${amountToPay.toLocaleString()} Now` : 'Make Advance Payment'}
           </Text>
-          <Text style={[styles.subDate, { color: colors.textSecondary }]} allowFontScaling={false}>
-            Due date: {tenantData.nextDueDate}
-          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* =========================================================================
+          CARD 1: MAINTENANCE & REPAIRS
+          ========================================================================= */}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+        <View style={styles.cardHeaderRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={[styles.cardIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+              <Ionicons name="construct" size={17} color="#ef4444" />
+            </View>
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]} allowFontScaling={false}>
+              Maintenance & Repairs
+            </Text>
+          </View>
 
           <TouchableOpacity
-            style={styles.primaryActionBtn}
-            onPress={() => setPayModalVisible(true)}
-            activeOpacity={0.8}
+            style={styles.cardHeaderActionBtn}
+            onPress={() => setTicketModalVisible(true)}
+            activeOpacity={0.7}
           >
-            <Ionicons name="card-outline" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-            <Text style={styles.primaryActionBtnText} allowFontScaling={false}>
-              Pay Rent Now
-            </Text>
+            <Ionicons name="add" size={14} color="#38bdf8" style={{ marginRight: 2 }} />
+            <Text style={styles.cardHeaderActionText} allowFontScaling={false}>New Request</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* =========================================================================
-          CARD 2: OUTSTANDING BALANCE & STATUS
-          ========================================================================= */}
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-        <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: colors.textPrimary }]} allowFontScaling={false}>
-            Outstanding balance
-          </Text>
-        </View>
-
-        <View style={styles.cardBodyPadding}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text
-              style={[
-                styles.bigAmount,
-                { color: isPaidInFull ? '#10b981' : '#ef4444' },
-              ]}
-              allowFontScaling={false}
-            >
-              ${tenantData.outstandingBalance.toLocaleString()}
-            </Text>
-
-            <View
-              style={[
-                styles.statusBadge,
-                {
-                  backgroundColor: isPaidInFull ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusBadgeText,
-                  { color: isPaidInFull ? '#10b981' : '#ef4444' },
-                ]}
-                allowFontScaling={false}
-              >
-                {isPaidInFull ? 'Paid in full' : 'Balance overdue'}
-              </Text>
+        <View style={styles.cardBody}>
+          {recentTicket ? (
+            <View style={[styles.ticketRow, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={[styles.ticketTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {recentTicket.title}
+                </Text>
+                <Text style={[styles.ticketDate, { color: colors.textSecondary }]}>
+                  Reported on {recentTicket.date || 'Recent'}
+                </Text>
+              </View>
+              <View style={[styles.ticketStatusPill, { 
+                backgroundColor: recentTicket.status === 'Completed' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(56, 189, 248, 0.15)' 
+              }]}>
+                <Text style={[styles.ticketStatusText, { 
+                  color: recentTicket.status === 'Completed' ? '#10b981' : '#38bdf8' 
+                }]}>
+                  {recentTicket.status || 'In Progress'}
+                </Text>
+              </View>
             </View>
-          </View>
-          <Text style={[styles.subDate, { color: colors.textSecondary, marginTop: 8 }]} allowFontScaling={false}>
-            {isPaidInFull ? 'No pending invoices or charges' : 'Please settle open invoices via portal payment'}
-          </Text>
+          ) : (
+            <View style={styles.emptyMaintenanceBox}>
+              <Ionicons name="checkmark-done-circle-outline" size={28} color="#10b981" style={{ marginBottom: 4 }} />
+              <Text style={[styles.emptyMaintenanceText, { color: colors.textSecondary }]}>
+                No active repair requests. Need something fixed?
+              </Text>
+              <TouchableOpacity
+                style={[styles.outlineActionBtn, { borderColor: colors.cardBorder, marginTop: 8 }]}
+                onPress={() => setTicketModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="hammer-outline" size={15} color="#38bdf8" style={{ marginRight: 6 }} />
+                <Text style={styles.outlineActionText}>Report an Issue</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
 
       {/* =========================================================================
-          CARD 3: LEASE DETAILS & HOME
+          CARD 2: MY HOME & LEASE DETAILS
           ========================================================================= */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-        <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: colors.textPrimary }]} allowFontScaling={false}>
-            Lease agreement
-          </Text>
-        </View>
-
-        <View style={styles.cardBodyPadding}>
-          <View style={styles.leaseDetailRow}>
-            <Text style={[styles.leaseLabel, { color: colors.textSecondary }]} allowFontScaling={false}>
-              Property:
-            </Text>
-            <Text style={[styles.leaseValue, { color: colors.textPrimary }]} allowFontScaling={false}>
-              {tenantData.propertyName}
-            </Text>
-          </View>
-
-          <View style={styles.leaseDetailRow}>
-            <Text style={[styles.leaseLabel, { color: colors.textSecondary }]} allowFontScaling={false}>
-              Unit:
-            </Text>
-            <Text style={[styles.leaseValue, { color: colors.textPrimary }]} allowFontScaling={false}>
-              Unit {tenantData.unitNumber}
-            </Text>
-          </View>
-
-          <View style={styles.leaseDetailRow}>
-            <Text style={[styles.leaseLabel, { color: colors.textSecondary }]} allowFontScaling={false}>
-              Expires on:
-            </Text>
-            <Text style={[styles.leaseValue, { color: colors.textPrimary }]} allowFontScaling={false}>
-              {tenantData.leaseExpiration}
+        <View style={styles.cardHeaderRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={[styles.cardIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.12)' }]}>
+              <Ionicons name="home" size={17} color="#0284c7" />
+            </View>
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]} allowFontScaling={false}>
+              My Home & Lease Details
             </Text>
           </View>
 
           {onNavigate && (
             <TouchableOpacity
-              style={[styles.outlineBtn, { borderColor: colors.cardBorder, marginTop: 14 }]}
+              style={styles.cardHeaderActionBtn}
               onPress={() => onNavigate('lease')}
               activeOpacity={0.7}
             >
-              <Text style={[styles.outlineBtnText, { color: colors.textPrimary }]} allowFontScaling={false}>
-                View Lease Agreement
+              <Text style={styles.cardHeaderActionText} allowFontScaling={false}>View Full</Text>
+              <Ionicons name="chevron-forward" size={13} color="#38bdf8" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.cardBody}>
+          <View style={styles.leaseGrid}>
+            <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>PROPERTY</Text>
+              <Text style={[styles.leaseBoxVal, { color: colors.textPrimary }]} numberOfLines={1}>
+                {tenantData.propertyName}
               </Text>
+            </View>
+
+            <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>ASSIGNED UNIT</Text>
+              <Text style={[styles.leaseBoxVal, { color: colors.textPrimary }]} numberOfLines={1}>
+                {tenantData.unitNumber && tenantData.unitNumber !== 'N/A' ? `Unit ${tenantData.unitNumber}` : 'Standard'}
+              </Text>
+            </View>
+
+            <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>MONTHLY RENT</Text>
+              <Text style={[styles.leaseBoxVal, { color: '#38bdf8' }]} numberOfLines={1}>
+                ${(tenantData.currentRent || 0).toLocaleString()} / mo
+              </Text>
+            </View>
+
+            <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>LEASE EXPIRES</Text>
+              <Text style={[styles.leaseBoxVal, { color: colors.textPrimary }]} numberOfLines={1}>
+                {tenantData.leaseExpiration}
+              </Text>
+            </View>
+          </View>
+
+          {onNavigate && (
+            <TouchableOpacity
+              style={[styles.outlineActionBtn, { borderColor: colors.cardBorder, marginTop: 12 }]}
+              onPress={() => onNavigate('lease')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="document-text-outline" size={15} color="#38bdf8" style={{ marginRight: 6 }} />
+              <Text style={styles.outlineActionText}>Download Signed Agreement PDF</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
       {/* =========================================================================
-          CARD 4: QUICK RESIDENT ACTIONS
+          BOTTOM QUICK ACTIONS: CHAT, DOCUMENTS, HISTORY
           ========================================================================= */}
-      <View style={styles.quickActionsContainer}>
+      <View style={styles.quickFooterRow}>
         <TouchableOpacity
-          style={[styles.actionTile, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-          onPress={() => setPayModalVisible(true)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.actionIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
-            <Ionicons name="card" size={22} color="#0284c7" />
-          </View>
-          <Text style={[styles.actionTileTitle, { color: colors.textPrimary }]} allowFontScaling={false}>
-            Pay Rent
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionTile, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-          onPress={() => setTicketModalVisible(true)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.actionIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-            <Ionicons name="hammer" size={22} color="#ef4444" />
-          </View>
-          <Text style={[styles.actionTileTitle, { color: colors.textPrimary }]} allowFontScaling={false}>
-            Repair
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionTile, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          style={[styles.quickFooterBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           onPress={() => onNavigate && onNavigate('messages')}
           activeOpacity={0.7}
         >
-          <View style={[styles.actionIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-            <Ionicons name="chatbubbles" size={22} color="#10b981" />
-          </View>
-          <Text style={[styles.actionTileTitle, { color: colors.textPrimary }]} allowFontScaling={false}>
-            Messages
-          </Text>
+          <Ionicons name="chatbubbles-outline" size={18} color="#10b981" />
+          <Text style={[styles.quickFooterBtnText, { color: colors.textPrimary }]}>Manager Chat</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.actionTile, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          style={[styles.quickFooterBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           onPress={() => onNavigate && onNavigate('documents')}
           activeOpacity={0.7}
         >
-          <View style={[styles.actionIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
-            <Ionicons name="document-text" size={22} color="#f59e0b" />
-          </View>
-          <Text style={[styles.actionTileTitle, { color: colors.textPrimary }]} allowFontScaling={false}>
-            Documents
-          </Text>
+          <Ionicons name="folder-outline" size={18} color="#f59e0b" />
+          <Text style={[styles.quickFooterBtnText, { color: colors.textPrimary }]}>Documents</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.quickFooterBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          onPress={() => setPayModalVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="receipt-outline" size={18} color="#a855f7" />
+          <Text style={[styles.quickFooterBtnText, { color: colors.textPrimary }]}>Receipts</Text>
         </TouchableOpacity>
       </View>
 
@@ -713,6 +782,53 @@ export const TenantDashboard = ({ onNavigate }) => {
           </View>
         </View>
       </Modal>
+
+      {/* =========================================================================
+          NOTICE READER MODAL (Clean Full Text on demand)
+          ========================================================================= */}
+      <Modal visible={noticeModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
+                <Ionicons name="megaphone-outline" size={20} color="#f59e0b" style={{ marginRight: 8 }} />
+                <Text style={[styles.modalTitle, { color: colors.textPrimary, marginBottom: 0, textAlign: 'left' }]} numberOfLines={1}>
+                  {getNoticeSubject(latestNotice)}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setNoticeModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={22} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 280, marginVertical: 8 }} showsVerticalScrollIndicator={false}>
+              <Text style={{ fontSize: 13.5, color: colors.textPrimary, lineHeight: 22 }}>
+                {latestNotice?.message || latestNotice?.title}
+              </Text>
+            </ScrollView>
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn]}
+                onPress={() => setNoticeModalVisible(false)}
+              >
+                <Text style={styles.modalCancelBtnText}>Close</Text>
+              </TouchableOpacity>
+              {amountToPay > 0 && (
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalConfirmBtn]}
+                  onPress={() => {
+                    setNoticeModalVisible(false);
+                    setPayModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.modalConfirmBtnText}>Pay Now</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -738,8 +854,9 @@ const getStyles = (colors, isDarkMode) =>
       fontWeight: '600',
     },
 
+    // Header
     welcomeSection: {
-      marginBottom: 16,
+      marginBottom: 14,
       paddingHorizontal: 4,
     },
     welcomeGreeting: {
@@ -747,156 +864,289 @@ const getStyles = (colors, isDarkMode) =>
       fontWeight: '800',
       letterSpacing: -0.4,
     },
-    welcomeLocation: {
-      fontSize: 13.5,
-      fontWeight: '500',
+    unitLocationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
       marginTop: 4,
     },
+    welcomeLocation: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
 
+    // Notice Strip (1-Line Compact Banner)
+    noticeStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      marginBottom: 14,
+      elevation: 1,
+    },
+    noticeIconWrapper: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 10,
+    },
+    noticeStripBadge: {
+      fontSize: 9.5,
+      fontWeight: '800',
+      color: '#f59e0b',
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      marginRight: 6,
+    },
+    noticeStripTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      flex: 1,
+    },
+    noticeStripPreview: {
+      fontSize: 11.5,
+      marginTop: 2,
+    },
+    noticeReadPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(56, 189, 248, 0.12)',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+    },
+    noticeReadText: {
+      color: '#38bdf8',
+      fontSize: 11.5,
+      fontWeight: '700',
+      marginRight: 2,
+    },
+
+    // Screening Banner
     alertBanner: {
       flexDirection: 'row',
       alignItems: 'center',
       borderWidth: 1,
       borderRadius: 14,
-      padding: 14,
-      marginBottom: 16,
-    },
-    alertMessage: {
-      fontSize: 12.5,
-      fontWeight: '600',
-      lineHeight: 18,
-    },
-    alertActionBtn: {
-      backgroundColor: '#6366f1',
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 8,
-      marginLeft: 12,
-    },
-    alertActionBtnText: {
-      color: '#ffffff',
-      fontSize: 12,
-      fontWeight: '800',
+      padding: 12,
+      marginBottom: 14,
     },
 
-    // Card (Matching DoorLoop Clean Card Design)
-    card: {
-      borderRadius: 16,
+    // TOP HERO FINANCIAL CARD
+    heroCard: {
+      borderRadius: 18,
       borderWidth: 1,
+      padding: 20,
       marginBottom: 16,
-      overflow: 'hidden',
       elevation: 2,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: isDarkMode ? 0.3 : 0.05,
       shadowRadius: 8,
     },
-    cardHeader: {
-      paddingHorizontal: 18,
-      paddingTop: 16,
-      paddingBottom: 6,
+    heroHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
     },
-    cardTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      letterSpacing: -0.2,
+    heroDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: 8,
     },
-    cardBodyPadding: {
-      paddingHorizontal: 18,
-      paddingBottom: 18,
-      paddingTop: 4,
+    heroCardLabel: {
+      fontSize: 11.5,
+      fontWeight: '800',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
     },
-    bigAmount: {
-      fontSize: 30,
+    heroStatusBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    heroStatusText: {
+      fontSize: 11,
+      fontWeight: '800',
+    },
+    heroAmountRow: {
+      marginVertical: 4,
+    },
+    heroAmountText: {
+      fontSize: 34,
       fontWeight: '900',
-      letterSpacing: -0.5,
+      letterSpacing: -0.6,
     },
-    subDate: {
-      fontSize: 13,
+    heroDueDateText: {
+      fontSize: 12.5,
       fontWeight: '500',
       marginTop: 4,
     },
-    primaryActionBtn: {
-      backgroundColor: '#0284c7',
-      borderRadius: 10,
+    heroPayBtn: {
+      borderRadius: 12,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 13,
+      paddingVertical: 14,
       marginTop: 16,
+      elevation: 2,
+    },
+    heroPayBtnText: {
+      color: '#ffffff',
+      fontSize: 14.5,
+      fontWeight: '800',
+    },
+
+    // GENERAL CARD (Maintenance & Lease)
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      marginBottom: 14,
+      overflow: 'hidden',
       elevation: 1,
     },
-    primaryActionBtnText: {
-      color: '#ffffff',
-      fontSize: 14,
-      fontWeight: '800',
-    },
-
-    statusBadge: {
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-      borderRadius: 20,
-    },
-    statusBadgeText: {
-      fontSize: 12,
-      fontWeight: '800',
-    },
-
-    leaseDetailRow: {
+    cardHeaderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingVertical: 6,
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 8,
     },
-    leaseLabel: {
-      fontSize: 13,
-      fontWeight: '500',
+    cardIconBox: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 8,
     },
-    leaseValue: {
-      fontSize: 13.5,
+    cardTitle: {
+      fontSize: 14.5,
       fontWeight: '700',
     },
+    cardHeaderActionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 4,
+      paddingHorizontal: 6,
+    },
+    cardHeaderActionText: {
+      color: '#38bdf8',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    cardBody: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      paddingTop: 4,
+    },
 
-    outlineBtn: {
+    // Maintenance ticket row
+    ticketRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 12,
+    },
+    ticketTitle: {
+      fontSize: 13.5,
+      fontWeight: '700',
+      marginBottom: 3,
+    },
+    ticketDate: {
+      fontSize: 11.5,
+    },
+    ticketStatusPill: {
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      borderRadius: 8,
+    },
+    ticketStatusText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    emptyMaintenanceBox: {
+      alignItems: 'center',
+      paddingVertical: 12,
+    },
+    emptyMaintenanceText: {
+      fontSize: 12.5,
+      textAlign: 'center',
+    },
+    outlineActionBtn: {
       borderWidth: 1,
       borderRadius: 10,
       paddingVertical: 10,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      width: '100%',
     },
-    outlineBtnText: {
+    outlineActionText: {
       fontSize: 13,
+      fontWeight: '700',
+      color: '#38bdf8',
+    },
+
+    // Lease 2x2 Grid
+    leaseGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    leaseBox: {
+      flex: 1,
+      minWidth: '46%',
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 12,
+    },
+    leaseBoxLabel: {
+      fontSize: 10.5,
+      fontWeight: '700',
+      marginBottom: 4,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    leaseBoxVal: {
+      fontSize: 13.5,
       fontWeight: '700',
     },
 
-    // Quick Actions
-    quickActionsContainer: {
+    // Quick Footer Row
+    quickFooterRow: {
       flexDirection: 'row',
       gap: 10,
-      marginBottom: 16,
+      marginTop: 4,
+      marginBottom: 10,
     },
-    actionTile: {
+    quickFooterBtn: {
       flex: 1,
-      borderRadius: 14,
-      borderWidth: 1,
-      paddingVertical: 14,
+      flexDirection: 'row',
       alignItems: 'center',
-      elevation: 1,
-    },
-    actionIconBox: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
       justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 8,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingVertical: 12,
+      gap: 6,
     },
-    actionTileTitle: {
+    quickFooterBtnText: {
       fontSize: 12,
       fontWeight: '700',
     },
 
-    // Modal
+    // Modals
     modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.5)',
@@ -932,10 +1182,18 @@ const getStyles = (colors, isDarkMode) =>
       fontSize: 13.5,
       marginBottom: 12,
     },
+    outlineBtn: {
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingVertical: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     modalBtnRow: {
       flexDirection: 'row',
       gap: 12,
-      marginTop: 8,
+      marginTop: 10,
     },
     modalBtn: {
       flex: 1,

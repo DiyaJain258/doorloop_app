@@ -163,7 +163,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
 
           <TouchableOpacity
             style={styles.actionBtnOutline}
-            onPress={() => Alert.alert('Tax Documents', 'Tax documents ready for download.')}
+            onPress={() => onNavigate('documents')}
             activeOpacity={0.8}
           >
             <Ionicons name="document-attach-outline" size={15} color="#cbd5e1" style={{ marginRight: 6 }} />
