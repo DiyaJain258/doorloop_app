@@ -1791,16 +1791,16 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                 {/* PAYMENT INTEGRATION & MERCHANT ACCOUNT CARD */}
                 <View style={styles.propPaymentBox}>
                   <View style={styles.propPaymentHeaderRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                      <Ionicons name="card" size={16} color="#2563eb" />
-                      <Text style={styles.propPaymentTitle} allowFontScaling={false}>
-                        PAYMENT INTEGRATION & MERCHANT ACCOUNT
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 6 }}>
+                      <Ionicons name="card" size={15} color="#2563eb" />
+                      <Text style={styles.propPaymentTitle} allowFontScaling={false} numberOfLines={1}>
+                        PAYMENT INTEGRATION
                       </Text>
                     </View>
                     <View style={styles.companyDefaultBadge}>
-                      <Ionicons name="checkmark-circle-outline" size={12} color="#059669" />
+                      <Ionicons name="shield-checkmark" size={11} color="#059669" />
                       <Text style={styles.companyDefaultBadgeText} allowFontScaling={false}>
-                        Company Default (Option 2 Fallback)
+                        Company Default
                       </Text>
                     </View>
                   </View>
@@ -1838,21 +1838,21 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                     onPress={() => setShowPropAdditional(!showPropAdditional)}
                     activeOpacity={0.7}
                   >
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
                       <Text style={styles.propAccordionTitle} allowFontScaling={false}>
                         ADDITIONAL DETAILS <Text style={styles.optionalTag}>(OPTIONAL)</Text>
                       </Text>
-                      <Text style={styles.propAccordionSub} allowFontScaling={false}>
+                      <Text style={styles.propAccordionSub} allowFontScaling={false} numberOfLines={1}>
                         Financial Valuation, Property Photo & Documents
                       </Text>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                       <Text style={styles.propAccordionToggleText} allowFontScaling={false}>
                         {showPropAdditional ? 'Hide Details' : 'Show Details'}
                       </Text>
                       <Ionicons
                         name={showPropAdditional ? 'chevron-up' : 'chevron-down'}
-                        size={15}
+                        size={14}
                         color="#2563eb"
                       />
                     </View>
@@ -1860,34 +1860,6 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
                   {showPropAdditional && (
                     <View style={styles.propAccordionBody}>
-                      {/* YEAR BUILT & SQUARE FOOTAGE */}
-                      <View style={styles.twoColRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.fieldLabel} allowFontScaling={false}>YEAR BUILT</Text>
-                          <TextInput
-                            style={styles.propInput}
-                            keyboardType="numeric"
-                            placeholder="2020"
-                            placeholderTextColor={colors.placeholder}
-                            value={pYearBuilt}
-                            onChangeText={setPYearBuilt}
-                            allowFontScaling={false}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.fieldLabel} allowFontScaling={false}>SQUARE FOOTAGE (SQFT)</Text>
-                          <TextInput
-                            style={styles.propInput}
-                            keyboardType="numeric"
-                            placeholder="8500"
-                            placeholderTextColor={colors.placeholder}
-                            value={pSqft}
-                            onChangeText={setPSqft}
-                            allowFontScaling={false}
-                          />
-                        </View>
-                      </View>
-
                       {/* PURCHASE PRICE & CURRENT VALUATION */}
                       <View style={styles.twoColRow}>
                         <View style={{ flex: 1 }}>
@@ -3643,8 +3615,8 @@ const getStyles = (colors, isDarkMode) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: 6,
+      gap: 8,
+      marginBottom: 3,
     },
     propPaymentTitle: {
       fontSize: 11,
@@ -3661,7 +3633,8 @@ const getStyles = (colors, isDarkMode) =>
       borderWidth: 1,
       borderRadius: 6,
       paddingHorizontal: 7,
-      paddingVertical: 2,
+      paddingVertical: 3,
+      flexShrink: 0,
     },
     companyDefaultBadgeText: {
       fontSize: 10,
