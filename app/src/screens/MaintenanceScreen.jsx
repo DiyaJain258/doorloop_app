@@ -121,7 +121,7 @@ const DonutPriorityChart = ({ data, total, isDarkMode, cardBg }) => {
         {/* Center Cutout Hole */}
         <View style={[donutStyles.innerHole, { backgroundColor: cardBg }]}>
           <Text style={[donutStyles.innerTotal, { color: isDarkMode ? '#f8fafc' : '#0f172a' }]} allowFontScaling={false}>
-            {total || 177}
+            {total ?? 0}
           </Text>
           <Text style={donutStyles.innerLabel} allowFontScaling={false}>TICKETS</Text>
         </View>
@@ -129,10 +129,10 @@ const DonutPriorityChart = ({ data, total, isDarkMode, cardBg }) => {
 
       {/* Proportional Segmented Progress Bar */}
       <View style={donutStyles.progressBarRow}>
-        <View style={{ flex: 134, height: 7, backgroundColor: '#ef4444', borderTopLeftRadius: 4, borderBottomLeftRadius: 4, marginRight: 2 }} />
-        <View style={{ flex: 8, height: 7, backgroundColor: '#f59e0b', marginRight: 2 }} />
-        <View style={{ flex: 15, height: 7, backgroundColor: '#3b82f6', marginRight: 2 }} />
-        <View style={{ flex: 20, height: 7, backgroundColor: '#10b981', borderTopRightRadius: 4, borderBottomRightRadius: 4 }} />
+        <View style={{ flex: Math.max(data?.[0]?.value || 0, total === 0 ? 1 : 0), height: 7, backgroundColor: '#ef4444', borderTopLeftRadius: 4, borderBottomLeftRadius: 4, marginRight: 2 }} />
+        <View style={{ flex: Math.max(data?.[1]?.value || 0, total === 0 ? 1 : 0), height: 7, backgroundColor: '#f59e0b', marginRight: 2 }} />
+        <View style={{ flex: Math.max(data?.[2]?.value || 0, total === 0 ? 1 : 0), height: 7, backgroundColor: '#3b82f6', marginRight: 2 }} />
+        <View style={{ flex: Math.max(data?.[3]?.value || 0, total === 0 ? 1 : 0), height: 7, backgroundColor: '#10b981', borderTopRightRadius: 4, borderBottomRightRadius: 4 }} />
       </View>
 
       {/* 2x2 Legend Grid matching web */}
@@ -435,43 +435,21 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
       ]);
 
       // 1. Service Requests - Web API parity (api.serviceRequests.getAll())
-      let rawReqs = Array.isArray(reqsRes) ? reqsRes : (reqsRes?.data || []);
-      if (!rawReqs || rawReqs.length === 0) {
-        rawReqs = [
-          { id: 'sr-1', title: 'no light in bedroom', propertyName: '525 CENTRAL AVE', unitNumber: '2nd Floor', tenantName: 'luis', priority: 'Medium', status: 'Approved', createdAt: '2026-09-30' },
-          { id: 'sr-2', title: 'NYC DOB Violation: V092407E9011/215134', propertyName: '63 Verona Ave', unitNumber: '1st Floor', tenantName: 'NYC DOB Compliance Auditor', priority: 'Emergency', status: 'Pending', createdAt: '2026-09-08' },
-          { id: 'sr-3', title: 'AC Not Cooling – Unit 204', propertyName: '525 CENTRAL AVE', unitNumber: '204', tenantName: 'Elias Alexander Olivo', priority: 'High', status: 'In Progress', createdAt: '2026-09-05' },
-          { id: 'sr-4', title: 'Broken Window Latch – Unit 303', propertyName: '525 CENTRAL AVE', unitNumber: '303', tenantName: 'Elias Alexander Olivo', priority: 'Normal', status: 'Completed', createdAt: '2026-09-05' },
-          { id: 'sr-5', title: 'Water Leak Under Kitchen Sink', propertyName: '525 CENTRAL AVE', unitNumber: '102', tenantName: 'Elias Alexander Olivo', priority: 'Emergency', status: 'New', createdAt: '2026-09-05' },
-          { id: 'sr-6', title: 'Dryer Not Heating – Unit 408', propertyName: '525 CENTRAL AVE', unitNumber: '408', tenantName: 'Elias Alexander Olivo', priority: 'Normal', status: 'Assigned', createdAt: '2026-09-05' },
-          { id: 'sr-7', title: 'Hallway Light Flickering', propertyName: '525 CENTRAL AVE', unitNumber: 'Common', tenantName: 'Elias Alexander Olivo', priority: 'Low', status: 'New', createdAt: '2026-09-05' },
-        ];
-      }
+      const rawReqs = Array.isArray(reqsRes) ? reqsRes : (reqsRes?.data && Array.isArray(reqsRes.data) ? reqsRes.data : []);
       const mappedReqs = rawReqs.map((r, idx) => ({
         ...r,
         requestNumber: r.requestNumber ? (String(r.requestNumber).startsWith('#') ? r.requestNumber : `#${r.requestNumber}`) : `#${idx + 1}`,
-        propertyName: r.propertyName || r.unit?.property?.name || r.property?.name || r.title || '525 CENTRAL AVE',
+        propertyName: r.propertyName || r.property?.name || r.unit?.property?.name || r.title || 'Property',
         unitNumber: r.unitNumber || (r.unit?.unitNumber ? `${r.unit.unitNumber}` : ''),
         tenantName: r.tenantName || (r.tenant ? `${r.tenant.firstName || ''} ${r.tenant.lastName || ''}`.trim() : ''),
         priority: r.priority || 'Medium',
         status: r.status || 'New',
-        createdAt: r.createdAt ? (typeof r.createdAt === 'string' && r.createdAt.includes('T') ? r.createdAt.split('T')[0] : r.createdAt) : '2026-09-30',
+        createdAt: r.createdAt ? (typeof r.createdAt === 'string' && r.createdAt.includes('T') ? r.createdAt.split('T')[0] : r.createdAt) : '',
       }));
       setRequests(mappedReqs);
 
       // 2. Work Orders - Web API parity (api.workOrders.getAll())
-      let rawWo = Array.isArray(woRes) ? woRes : (woRes?.data || []);
-      if (!rawWo || rawWo.length === 0) {
-        rawWo = [
-          { id: 'wo-1', workOrderNumber: '#WO-1001', propertyName: '525 CENTRAL AVE', unitNumber: 'Unit 2nd Floor', vendorName: 'ProFix Solutions', assignedTechnician: 'Luis Morales', scheduledDate: '2026-09-30', estimatedCost: 150, actualCost: 120, status: 'Approved', title: 'no light in bedroom' },
-          { id: 'wo-2', workOrderNumber: '#WO-1002', propertyName: '63 Verona Ave', unitNumber: 'Unit 1st Floor', vendorName: 'Apex Pro Compliance', assignedTechnician: 'Auditor Tech', scheduledDate: '2026-09-08', estimatedCost: 500, actualCost: 0, status: 'Pending', title: 'NYC DOB Violation: V092407E9011/215134' },
-          { id: 'wo-3', workOrderNumber: '#WO-1003', propertyName: '525 CENTRAL AVE', unitNumber: 'Unit 204', vendorName: 'ProFix Solutions', assignedTechnician: 'Technician Lead 1', scheduledDate: '2026-09-05', estimatedCost: 350, actualCost: 350, status: 'In Progress', title: 'AC Not Cooling – Unit 204' },
-          { id: 'wo-4', workOrderNumber: '#WO-1004', propertyName: '525 CENTRAL AVE', unitNumber: 'Unit 303', vendorName: 'Apex Pro Plumbing', assignedTechnician: 'Robert Vance', scheduledDate: '2026-09-05', estimatedCost: 80, actualCost: 80, status: 'Completed', title: 'Broken Window Latch – Unit 303' },
-          { id: 'wo-5', workOrderNumber: '#WO-1005', propertyName: '525 CENTRAL AVE', unitNumber: 'Unit 102', vendorName: 'ProFix Solutions', assignedTechnician: 'Plumber John', scheduledDate: '2026-09-05', estimatedCost: 200, actualCost: 0, status: 'New', title: 'Water Leak Under Kitchen Sink' },
-          { id: 'wo-6', workOrderNumber: '#WO-1006', propertyName: '525 CENTRAL AVE', unitNumber: 'Unit 408', vendorName: 'Metro Appliance', assignedTechnician: 'Dave Appli', scheduledDate: '2026-09-05', estimatedCost: 120, actualCost: 0, status: 'Assigned', title: 'Dryer Not Heating – Unit 408' },
-          { id: 'wo-7', workOrderNumber: '#WO-1007', propertyName: '525 CENTRAL AVE', unitNumber: 'Common Area', vendorName: 'Pro Electrician Services', assignedTechnician: 'Electrician Sam', scheduledDate: '2026-09-05', estimatedCost: 65, actualCost: 0, status: 'New', title: 'Hallway Light Flickering' },
-        ];
-      }
+      const rawWo = Array.isArray(woRes) ? woRes : (woRes?.data && Array.isArray(woRes.data) ? woRes.data : []);
       const mappedWo = rawWo.map((w, idx) => ({
         ...w,
         workOrderNumber: w.workOrderNumber && !w.workOrderNumber.includes('-') && w.workOrderNumber.startsWith('#')
@@ -489,16 +467,7 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
       setWorkOrders(mappedWo);
 
       // 3. Violations - Web API parity (api.violations.getAll())
-      let rawViolations = Array.isArray(violRes) ? violRes : (violRes?.data || []);
-      if (!rawViolations || rawViolations.length === 0) {
-        rawViolations = [
-          { id: 'v-1', violationCode: 'V*012405E94444118605', propertyName: '63 Verona Ave', unitNumber: '1st Floor', issuingAuthority: 'NYC Department of Buildings (DOB)', description: 'PVT: SATISFIED BY ISSUANCE OF FINAL CERT FOR EA/EBN', fineAmount: 250, dueDate: '2026-11-15', severity: 'Warning', status: 'Resolved' },
-          { id: 'v-2', violationCode: 'V010112BENCH02690', propertyName: '63 Verona Ave', unitNumber: '1st Floor', issuingAuthority: 'NYC Department of Buildings (DOB)', description: 'FAILURE TO FILE BENCHMARKING REPORT OF ENERGY USE AS PER AD. CODE SEC. 28-309.4', fineAmount: 500, dueDate: '2026-10-31', severity: 'Hazardous', status: 'Open' },
-          { id: 'v-3', violationCode: 'LL97-2024-EMISSIONS', propertyName: '525 CENTRAL AVE', unitNumber: 'Building Wide', issuingAuthority: 'NYC Department of Buildings (DOB)', description: 'Local Law 97 Carbon Emissions Limit Audit notice for multifamily portfolio.', fineAmount: 1250, dueDate: '2026-12-01', severity: 'Critical', status: 'Open' },
-          { id: 'v-4', violationCode: 'DOB-ELEC-7712', propertyName: '525 CENTRAL AVE', unitNumber: 'Basement', issuingAuthority: 'NYC Department of Buildings (DOB)', description: 'Exposed electrical wiring without junction box in utility room.', fineAmount: 350, dueDate: '2026-11-05', severity: 'Hazardous', status: 'Open' },
-          { id: 'v-5', violationCode: 'FDNY-FIRE-0991', propertyName: '63 Verona Ave', unitNumber: 'Stairwell B', issuingAuthority: 'NYC Department of Buildings (DOB)', description: 'Emergency egress lighting battery backup failed testing cycle.', fineAmount: 400, dueDate: '2026-10-25', severity: 'Critical', status: 'Open' },
-        ];
-      }
+      const rawViolations = Array.isArray(violRes) ? violRes : (violRes?.data && Array.isArray(violRes.data) ? violRes.data : []);
       const parsedViolations = rawViolations.map((v) => {
         let rawPropName = v.unit?.property?.name || v.propertyName || 'NYC Building Asset';
         let unitStr = v.unit?.unitNumber ? `Unit ${v.unit.unitNumber}` : (v.unitNumber || 'Building Wide');
@@ -507,13 +476,13 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
         }
         return {
           id: v.id,
-          propertyId: v.unit?.propertyId || v.propertyId || 'prop-1',
+          propertyId: v.unit?.propertyId || v.propertyId || '',
           propertyName: rawPropName,
           unitNumber: unitStr,
           violationCode: v.title || v.violationCode || 'DOB Citation',
-          issuingAuthority: 'NYC Department of Buildings (DOB)',
+          issuingAuthority: v.issuingAuthority || 'NYC Department of Buildings (DOB)',
           description: v.description || 'DOB Building Compliance Notice',
-          fineAmount: v.fineAmount || 250,
+          fineAmount: Number(v.fineAmount || 250),
           dueDate: v.dueDate || (v.createdAt ? (typeof v.createdAt === 'string' && v.createdAt.includes('T') ? v.createdAt.split('T')[0] : v.createdAt) : new Date().toISOString().split('T')[0]),
           severity: v.severity || 'Warning',
           status: v.status || 'Open',
@@ -525,7 +494,7 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
       let staffList = [];
       try {
         const compRes = await apiClient.get('/superadmin/company-users', logout, refreshAccessToken).catch(() => null);
-        const cUsers = Array.isArray(compRes) ? compRes : (compRes?.data || []);
+        const cUsers = Array.isArray(compRes) ? compRes : (compRes?.data && Array.isArray(compRes.data) ? compRes.data : []);
         const maintUsers = cUsers.filter(u => u.role === 'Maintenance Staff' || u.role === 'Maintenance');
         if (maintUsers.length > 0) {
           staffList = maintUsers.map(u => ({
@@ -548,7 +517,7 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
       }
 
       if (staffList.length === 0) {
-        const rawVendors = Array.isArray(staffRes) ? staffRes : (staffRes?.data || []);
+        const rawVendors = Array.isArray(staffRes) ? staffRes : (staffRes?.data && Array.isArray(staffRes.data) ? staffRes.data : []);
         if (rawVendors.length > 0) {
           staffList = rawVendors.map(v => ({
             id: v.id,
@@ -565,17 +534,6 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
             status: v.status || 'Active',
           }));
         }
-      }
-
-      if (staffList.length === 0) {
-        staffList = [
-          { id: 'ven-1', name: 'Apex Pro Plumbing & Maintenance Co.', companyName: 'Apex Pro Plumbing & Maintenance Co.', contactName: 'Robert Vance', email: 'robert@apexplumbing.com', phone: '(512) 555-0199', category: 'Plumber', serviceType: 'Plumber', rating: 4.9, activeJobs: 3, completedJobs: 42, status: 'Active' },
-          { id: 'ven-2', name: 'Pro Electrician Services Inc', companyName: 'Pro Electrician Services Inc', contactName: 'Samuel Sparks', email: 'contact@proelectric.com', phone: '(512) 555-8101', category: 'Electrician', serviceType: 'Electrician', rating: 4.8, activeJobs: 2, completedJobs: 38, status: 'Active' },
-          { id: 'ven-3', name: 'ProFix Solutions', companyName: 'ProFix Solutions', contactName: 'Luis Morales', email: 'luis@profixsolutions.com', phone: '(512) 555-8104', category: 'General Contractor', serviceType: 'General Contractor', rating: 4.9, activeJobs: 4, completedJobs: 56, status: 'Active' },
-          { id: 'ven-4', name: 'Metro HVAC & Cooling Specialists', companyName: 'Metro HVAC & Cooling Specialists', contactName: 'Marcus Cole', email: 'marcus@metrohvac.com', phone: '(512) 555-8103', category: 'HVAC', serviceType: 'HVAC', rating: 4.7, activeJobs: 1, completedJobs: 29, status: 'Active' },
-          { id: 'ven-5', name: 'Metro Appliance & Refrigeration', companyName: 'Metro Appliance & Refrigeration', contactName: 'Dave Miller', email: 'dave@metroappliance.com', phone: '(512) 555-8105', category: 'Appliance Repair', serviceType: 'Appliance Repair', rating: 4.8, activeJobs: 2, completedJobs: 33, status: 'Active' },
-          { id: 'ven-6', name: 'Tri-State Roofing & Waterproofing', companyName: 'Tri-State Roofing & Waterproofing', contactName: 'Paul Jackson', email: 'paul@tristateroof.com', phone: '(512) 555-8106', category: 'Roofing', serviceType: 'Roofing', rating: 4.9, activeJobs: 1, completedJobs: 19, status: 'Active' },
-        ];
       }
       setStaff(staffList);
 
@@ -603,21 +561,21 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
     fetchMaintenanceData();
   };
 
-  // Dashboard metrics strictly matching Web Frontend MaintenanceDashboardPage.tsx (api.maintenance.getMetrics())
+  // Dashboard metrics strictly matching Web Frontend MaintenanceDashboardPage.tsx (derived dynamically from live DB data)
   const metrics = {
-    openRequests: 1508,
-    emergencyRequests: 134,
-    workOrdersInProgress: 168,
-    completedThisMonth: 168,
+    openRequests: requests.filter(r => r.status !== 'Completed' && r.status !== 'Cancelled').length,
+    emergencyRequests: requests.filter(r => r.priority === 'Urgent' || r.priority === 'Emergency').length,
+    workOrdersInProgress: workOrders.filter(w => w.status === 'In Progress' || w.status === 'InProgress').length,
+    completedThisMonth: workOrders.filter(w => w.status === 'Completed' || w.status === 'Resolved').length,
     avgCompletionTime: '3.2 days',
-    totalMaintenanceCost: 94080,
+    totalMaintenanceCost: workOrders.reduce((sum, w) => sum + (Number(w.actualCost) || 0), 0),
   };
 
   const priorityData = [
-    { name: 'Urgent', value: 134, color: '#ef4444' },
-    { name: 'High', value: 8, color: '#f59e0b' },
-    { name: 'Medium', value: 15, color: '#3b82f6' },
-    { name: 'Low', value: 20, color: '#10b981' },
+    { name: 'Urgent', value: requests.filter(r => r.priority === 'Urgent' || r.priority === 'Emergency').length, color: '#ef4444' },
+    { name: 'High', value: requests.filter(r => r.priority === 'High').length, color: '#f59e0b' },
+    { name: 'Medium', value: requests.filter(r => r.priority === 'Medium').length, color: '#3b82f6' },
+    { name: 'Low', value: requests.filter(r => r.priority === 'Low' || r.priority === 'Normal').length, color: '#10b981' },
   ];
 
   // Recent 5 Service Requests matching Web MaintenanceDashboardPage.tsx recentRequests

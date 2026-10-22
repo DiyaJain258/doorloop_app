@@ -42,6 +42,7 @@ import { ReportsScreen } from './screens/ReportsScreen';
 import { InvoicesScreen } from './screens/InvoicesScreen';
 import { TenantLedgerScreen } from './screens/TenantLedgerScreen';
 import { TenantServicesScreen } from './screens/TenantServicesScreen';
+import { TenantMaintenanceScreen } from './screens/TenantMaintenanceScreen';
 import { OwnerFinancialsScreen } from './screens/OwnerFinancialsScreen';
 import { OwnerMaintenanceScreen } from './screens/OwnerMaintenanceScreen';
 import { OwnerReportsScreen } from './screens/OwnerReportsScreen';
@@ -395,6 +396,9 @@ export default function App() {
           : activeTab === 'vendors'
           ? 'staff'
           : 'requests';
+        if (role === 'Tenant') {
+          return <TenantMaintenanceScreen onNavigate={handleNavigate} />;
+        }
         return role === 'Owner'
           ? <OwnerMaintenanceScreen onNavigate={handleNavigate} />
           : <MaintenanceScreen initialTab={activeSubTab || defaultMaintenanceTab} onNavigate={handleNavigate} />;
