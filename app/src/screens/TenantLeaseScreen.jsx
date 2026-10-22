@@ -31,14 +31,9 @@ export const TenantLeaseScreen = () => {
     try {
       setLoading(true);
       // Strictly call same endpoint as web frontend: GET /portal/tenant/leases
-      const [leasesRes, singleLeaseRes] = await Promise.all([
-        apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/portal/tenant/lease', logout, refreshAccessToken).catch(() => null),
-      ]);
-
+      const leasesRes = await apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => null);
       const rawLeases = Array.isArray(leasesRes?.data) ? leasesRes.data : (Array.isArray(leasesRes) ? leasesRes : []);
-      const single = singleLeaseRes?.data || singleLeaseRes;
-      const rawLease = rawLeases.length > 0 ? rawLeases[0] : (single && single.id ? single : null);
+      const rawLease = rawLeases.length > 0 ? rawLeases[0] : null;
 
       if (rawLease) {
         setLeaseData({

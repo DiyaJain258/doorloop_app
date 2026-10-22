@@ -87,9 +87,8 @@ export const TenantDashboard = ({ onNavigate }) => {
   const fetchTenantPortalData = async () => {
     try {
       setLoading(true);
-      const [metricsRes, leaseRes, leasesRes, profileRes, screeningRes, notifsRes, maintenanceRes] = await Promise.all([
+      const [metricsRes, leasesRes, profileRes, screeningRes, notifsRes, maintenanceRes] = await Promise.all([
         apiClient.get('/portal/tenant/metrics', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/portal/tenant/lease', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/tenant/profile', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/screening/reports', logout, refreshAccessToken).catch(() => null),
@@ -98,14 +97,13 @@ export const TenantDashboard = ({ onNavigate }) => {
       ]);
 
       const metrics = metricsRes?.data || metricsRes || {};
-      const singleLease = leaseRes?.data || leaseRes || null;
-      const allLeases = leasesRes?.data || leasesRes || [];
+      const allLeases = Array.isArray(leasesRes?.data) ? leasesRes.data : (Array.isArray(leasesRes) ? leasesRes : []);
       const profile = profileRes?.data || profileRes || {};
       const reports = screeningRes?.data || screeningRes || [];
       const notifs = notifsRes?.data || notifsRes || [];
       const maintenance = maintenanceRes?.data || maintenanceRes || [];
 
-      const lease = (singleLease && singleLease.id) ? singleLease : (Array.isArray(allLeases) && allLeases.length > 0 ? allLeases[0] : null);
+      const lease = allLeases.length > 0 ? allLeases[0] : null;
       const hasActiveLease = !!lease;
       const propName = lease?.property?.name || lease?.propertyName || (hasActiveLease ? 'Property' : 'No Active Lease');
       const unitNum = lease?.unit?.unitNumber ? `Unit ${lease.unit.unitNumber}` : (lease?.unitNumber || (hasActiveLease ? 'Unit' : 'N/A'));

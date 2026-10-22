@@ -103,6 +103,36 @@ async function handleResponseError(response) {
   throw err;
 }
 
+const isNetworkResetError = (err) => {
+  if (!err) return false;
+  const msg = String(err.message || err).toLowerCase();
+  return (
+    msg.includes('connection reset') ||
+    msg.includes('socketexception') ||
+    msg.includes('network request failed') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('broken pipe') ||
+    msg.includes('econnreset') ||
+    msg.includes('econnrefused')
+  );
+};
+
+async function fetchWithRetry(url, options, maxRetries = 2) {
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      attempt++;
+      if (attempt > maxRetries || !isNetworkResetError(err)) {
+        throw err;
+      }
+      // Small pause before retrying with fresh socket to recover from OkHttp connection pooling resets
+      await new Promise((r) => setTimeout(r, attempt * 250));
+    }
+  }
+}
+
 let currentAuthToken = null;
 
 export const setAuthToken = (token) => {
@@ -172,6 +202,8 @@ export const apiClient = {
     const language = (await safeStorage.getItem('language')) || 'en';
     return {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Connection': 'close',
       'Accept-Language': language,
       'x-language': language,
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -182,6 +214,8 @@ export const apiClient = {
     const token = await apiClient.getToken();
     const language = (await safeStorage.getItem('language')) || 'en';
     return {
+      'Accept': 'application/json',
+      'Connection': 'close',
       'Accept-Language': language,
       'x-language': language,
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -192,7 +226,7 @@ export const apiClient = {
     const url = normalizeUrl(rawUrl);
     try {
       const headers = await apiClient.getHeaders();
-      let response = await fetch(`${BASE_URL}${url}`, {
+      let response = await fetchWithRetry(`${BASE_URL}${url}`, {
         method: 'GET',
         headers,
       });
@@ -201,7 +235,7 @@ export const apiClient = {
         const refreshed = await handleUnauthorized(logoutFn, refreshFn);
         if (refreshed) {
           const newHeaders = await apiClient.getHeaders();
-          response = await fetch(`${BASE_URL}${url}`, {
+          response = await fetchWithRetry(`${BASE_URL}${url}`, {
             method: 'GET',
             headers: newHeaders,
           });
@@ -224,7 +258,7 @@ export const apiClient = {
         if (fallbackUrl) {
           try {
             const fallbackHeaders = await apiClient.getHeaders();
-            const fallbackRes = await fetch(`${BASE_URL}${fallbackUrl}`, {
+            const fallbackRes = await fetchWithRetry(`${BASE_URL}${fallbackUrl}`, {
               method: 'GET',
               headers: fallbackHeaders,
             });
@@ -253,7 +287,7 @@ export const apiClient = {
       const isFormData = data instanceof FormData;
       const headers = isFormData ? await apiClient.getAuthHeaders() : await apiClient.getHeaders();
 
-      let response = await fetch(`${BASE_URL}${url}`, {
+      let response = await fetchWithRetry(`${BASE_URL}${url}`, {
         method: 'POST',
         headers,
         body: isFormData ? data : JSON.stringify(data),
@@ -263,7 +297,7 @@ export const apiClient = {
         const refreshed = await handleUnauthorized(logoutFn, refreshFn);
         if (refreshed) {
           const newHeaders = isFormData ? await apiClient.getAuthHeaders() : await apiClient.getHeaders();
-          response = await fetch(`${BASE_URL}${url}`, {
+          response = await fetchWithRetry(`${BASE_URL}${url}`, {
             method: 'POST',
             headers: newHeaders,
             body: isFormData ? data : JSON.stringify(data),
@@ -287,7 +321,7 @@ export const apiClient = {
       const isFormData = data instanceof FormData;
       const headers = isFormData ? await apiClient.getAuthHeaders() : await apiClient.getHeaders();
 
-      let response = await fetch(`${BASE_URL}${url}`, {
+      let response = await fetchWithRetry(`${BASE_URL}${url}`, {
         method: 'PUT',
         headers,
         body: isFormData ? data : data ? JSON.stringify(data) : undefined,
@@ -297,7 +331,7 @@ export const apiClient = {
         const refreshed = await handleUnauthorized(logoutFn, refreshFn);
         if (refreshed) {
           const newHeaders = isFormData ? await apiClient.getAuthHeaders() : await apiClient.getHeaders();
-          response = await fetch(`${BASE_URL}${url}`, {
+          response = await fetchWithRetry(`${BASE_URL}${url}`, {
             method: 'PUT',
             headers: newHeaders,
             body: isFormData ? data : data ? JSON.stringify(data) : undefined,
@@ -319,7 +353,7 @@ export const apiClient = {
     const url = normalizeUrl(rawUrl);
     try {
       const headers = await apiClient.getHeaders();
-      let response = await fetch(`${BASE_URL}${url}`, {
+      let response = await fetchWithRetry(`${BASE_URL}${url}`, {
         method: 'DELETE',
         headers,
       });
@@ -328,7 +362,7 @@ export const apiClient = {
         const refreshed = await handleUnauthorized(logoutFn, refreshFn);
         if (refreshed) {
           const newHeaders = await apiClient.getHeaders();
-          response = await fetch(`${BASE_URL}${url}`, {
+          response = await fetchWithRetry(`${BASE_URL}${url}`, {
             method: 'DELETE',
             headers: newHeaders,
           });
