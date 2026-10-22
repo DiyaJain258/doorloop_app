@@ -355,9 +355,14 @@ export const TenantDashboard = ({ onNavigate }) => {
     >
       {/* Welcome Header */}
       <View style={styles.welcomeSection}>
-        <Text style={[styles.welcomeGreeting, { color: colors.textPrimary }]} allowFontScaling={false}>
-          Hello, {tenantData.name} 👋
-        </Text>
+        <TouchableOpacity
+          onPress={() => onNavigate && onNavigate('profile')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.welcomeGreeting, { color: colors.textPrimary }]} allowFontScaling={false}>
+            Hello, {tenantData.name} 👋
+          </Text>
+        </TouchableOpacity>
         <View style={styles.unitLocationRow}>
           <Ionicons name="location-sharp" size={13} color="#38bdf8" style={{ marginRight: 4 }} />
           <Text style={[styles.welcomeLocation, { color: colors.textSecondary }]} allowFontScaling={false}>

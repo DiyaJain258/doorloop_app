@@ -43,6 +43,7 @@ import { InvoicesScreen } from './screens/InvoicesScreen';
 import { TenantLedgerScreen } from './screens/TenantLedgerScreen';
 import { TenantServicesScreen } from './screens/TenantServicesScreen';
 import { TenantMaintenanceScreen } from './screens/TenantMaintenanceScreen';
+import { TenantProfileScreen } from './screens/TenantProfileScreen';
 import { OwnerFinancialsScreen } from './screens/OwnerFinancialsScreen';
 import { OwnerMaintenanceScreen } from './screens/OwnerMaintenanceScreen';
 import { OwnerReportsScreen } from './screens/OwnerReportsScreen';
@@ -413,6 +414,9 @@ export default function App() {
       case 'admin':
         return <CompanySettingsScreen initialTab={activeSubTab || 'profile'} onNavigate={handleNavigate} />;
       case 'profile':
+        if (role === 'Tenant') {
+          return <TenantProfileScreen onNavigate={handleNavigate} />;
+        }
         return <ProfileScreen />;
       case 'more':
         if (role === 'Tenant') {
