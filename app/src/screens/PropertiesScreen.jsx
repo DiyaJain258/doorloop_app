@@ -207,6 +207,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
   // Unit Form Inputs
   const [uPropId, setUPropId] = useState('');
+  const [showUnitPropDropdown, setShowUnitPropDropdown] = useState(false);
   const [uNumber, setUNumber] = useState('');
   const [uFloor, setUFloor] = useState('1');
   const [uBeds, setUBeds] = useState('');
@@ -614,7 +615,8 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const handleOpenAddUnit = (preselectedPropId = null) => {
     setEditingUnitId(null);
     setEditingTenantId(null);
-    setUPropId(preselectedPropId || properties[0]?.id || '');
+    setUPropId(preselectedPropId || '');
+    setShowUnitPropDropdown(false);
     setUNumber('');
     setUFloor('1');
     setUBeds('');
@@ -1753,7 +1755,11 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                     activeOpacity={0.7}
                   >
                     <Text style={styles.propSelectValue} numberOfLines={1} allowFontScaling={false}>
-                      {owners.find((o) => o.id === pOwnerId)?.name || 'Select Owner...'}
+                      {(() => {
+                        const matched = owners.find((o) => (o.id === pOwnerId || o._id === pOwnerId));
+                        if (!matched) return 'Select Owner...';
+                        return matched.name || `${matched.firstName || ''} ${matched.lastName || ''}`.trim() || matched.email || 'Select Owner...';
+                      })()}
                     </Text>
                     <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
                   </TouchableOpacity>
@@ -1971,211 +1977,321 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
-
-        {/* DROPDOWN SELECTOR MODAL FOR PROPERTY FORM */}
-        <Modal visible={!!activePropDropdown} transparent animationType="fade">
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setActivePropDropdown(null)}
-          >
-            <View style={[styles.modalCard, { maxHeight: 380, width: '90%', alignSelf: 'center' }]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle} allowFontScaling={false}>
-                  {activePropDropdown === 'type'
-                    ? 'Select Property Type'
-                    : activePropDropdown === 'status'
-                    ? 'Select Status'
-                    : activePropDropdown === 'owner'
-                    ? 'Select Owner'
-                    : 'Select Payment Provider'}
-                </Text>
-                <TouchableOpacity onPress={() => setActivePropDropdown(null)}>
-                  <Ionicons name="close" size={20} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={{ marginVertical: 8 }} showsVerticalScrollIndicator={false}>
-                {activePropDropdown === 'type' &&
-                  PROPERTY_TYPES.map((t) => (
-                    <TouchableOpacity
-                      key={t}
-                      style={[styles.pickerRow, pType === t && styles.pickerRowSelected]}
-                      onPress={() => {
-                        setPType(t);
-                        setActivePropDropdown(null);
-                      }}
-                    >
-                      <Text style={[styles.detailVal, pType === t && { color: colors.primary }]} allowFontScaling={false}>
-                        {t}
+              {/* ------------------------------------------------------------------ */}
+              {/* IN-MODAL DROPDOWN SELECTOR OVERLAY (Guaranteed to work on iOS & Android) */}
+              {/* ------------------------------------------------------------------ */}
+              {!!activePropDropdown && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 99999,
+                    elevation: 99999,
+                    borderRadius: 14,
+                    padding: 16,
+                  }}
+                >
+                  <TouchableOpacity
+                    style={StyleSheet.absoluteFillObject}
+                    activeOpacity={1}
+                    onPress={() => setActivePropDropdown(null)}
+                  />
+                  <View
+                    style={[
+                      styles.modalCard,
+                      {
+                        maxHeight: 440,
+                        width: '100%',
+                        maxWidth: 420,
+                        zIndex: 100000,
+                        elevation: 100000,
+                        backgroundColor: colors.surface,
+                        borderColor: colors.cardBorder,
+                        borderWidth: 1,
+                        padding: 16,
+                        borderRadius: 14,
+                      },
+                    ]}
+                  >
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle} allowFontScaling={false}>
+                        {activePropDropdown === 'type'
+                          ? 'Select Property Type'
+                          : activePropDropdown === 'status'
+                          ? 'Select Status'
+                          : activePropDropdown === 'owner'
+                          ? 'Select Owner'
+                          : 'Select Payment Provider'}
                       </Text>
-                      {pType === t && <Ionicons name="checkmark" size={16} color={colors.primary} />}
-                    </TouchableOpacity>
-                  ))}
+                      <TouchableOpacity
+                        onPress={() => setActivePropDropdown(null)}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Ionicons name="close" size={20} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
 
-                {activePropDropdown === 'status' &&
-                  PROPERTY_STATUSES.map((st) => (
-                    <TouchableOpacity
-                      key={st}
-                      style={[styles.pickerRow, pStatus === st && styles.pickerRowSelected]}
-                      onPress={() => {
-                        setPStatus(st);
-                        setActivePropDropdown(null);
-                      }}
+                    <ScrollView
+                      style={{ marginVertical: 8, maxHeight: 330 }}
+                      showsVerticalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
                     >
-                      <Text style={[styles.detailVal, pStatus === st && { color: colors.primary }]} allowFontScaling={false}>
-                        {st}
-                      </Text>
-                      {pStatus === st && <Ionicons name="checkmark" size={16} color={colors.primary} />}
-                    </TouchableOpacity>
-                  ))}
-
-                {activePropDropdown === 'owner' && (
-                  <>
-                    {owners.length === 0 ? (
-                      <View style={{ padding: 16, alignItems: 'center' }}>
-                        <Text style={{ color: colors.textMuted, fontSize: 13 }} allowFontScaling={false}>
-                          No owners found. Please add an owner.
-                        </Text>
-                      </View>
-                    ) : (
-                      owners.map((o) => (
-                        <TouchableOpacity
-                          key={o.id}
-                          style={[styles.pickerRow, pOwnerId === o.id && styles.pickerRowSelected]}
-                          onPress={() => {
-                            setPOwnerId(o.id);
-                            setActivePropDropdown(null);
-                          }}
-                        >
-                          <View>
-                            <Text style={[styles.detailVal, pOwnerId === o.id && { color: colors.primary }]} allowFontScaling={false}>
-                              {o.name || `${o.firstName || ''} ${o.lastName || ''}`.trim() || 'Owner'}
-                            </Text>
-                            {o.email && (
-                              <Text style={{ fontSize: 11, color: colors.textMuted }} allowFontScaling={false}>
-                                {o.email}
+                      {activePropDropdown === 'type' &&
+                        PROPERTY_TYPES.map((t) => {
+                          const isSelected = pType === t;
+                          return (
+                            <TouchableOpacity
+                              key={t}
+                              style={[styles.pickerRow, isSelected && styles.pickerRowSelected]}
+                              onPress={() => {
+                                setPType(t);
+                                setActivePropDropdown(null);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text
+                                style={[styles.detailVal, isSelected && { color: colors.primary, fontWeight: '700' }]}
+                                allowFontScaling={false}
+                              >
+                                {t}
                               </Text>
-                            )}
-                          </View>
-                          {pOwnerId === o.id && <Ionicons name="checkmark" size={16} color={colors.primary} />}
-                        </TouchableOpacity>
-                      ))
-                    )}
-                    <TouchableOpacity
-                      style={[styles.closeBtn, { backgroundColor: '#2563eb', marginTop: 10 }]}
-                      onPress={() => {
-                        setActivePropDropdown(null);
-                        setIsQuickAddOwnerOpen(true);
-                      }}
-                    >
-                      <Text style={[styles.closeBtnText, { color: '#ffffff', fontWeight: '700' }]} allowFontScaling={false}>
-                        + Add New Owner
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+                              {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                            </TouchableOpacity>
+                          );
+                        })}
 
-                {activePropDropdown === 'paymentProvider' &&
-                  PAYMENT_PROVIDERS.map((pr) => (
-                    <TouchableOpacity
-                      key={pr}
-                      style={[styles.pickerRow, pPaymentProvider === pr && styles.pickerRowSelected]}
-                      onPress={() => {
-                        setPPaymentProvider(pr);
-                        setActivePropDropdown(null);
-                      }}
-                    >
-                      <Text style={[styles.detailVal, pPaymentProvider === pr && { color: colors.primary }]} allowFontScaling={false}>
-                        {pr}
-                      </Text>
-                      {pPaymentProvider === pr && <Ionicons name="checkmark" size={16} color={colors.primary} />}
-                    </TouchableOpacity>
-                  ))}
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </Modal>
+                      {activePropDropdown === 'status' &&
+                        PROPERTY_STATUSES.map((st) => {
+                          const isSelected = pStatus === st;
+                          return (
+                            <TouchableOpacity
+                              key={st}
+                              style={[styles.pickerRow, isSelected && styles.pickerRowSelected]}
+                              onPress={() => {
+                                setPStatus(st);
+                                setActivePropDropdown(null);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text
+                                style={[styles.detailVal, isSelected && { color: colors.primary, fontWeight: '700' }]}
+                                allowFontScaling={false}
+                              >
+                                {st}
+                              </Text>
+                              {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                            </TouchableOpacity>
+                          );
+                        })}
 
-        {/* QUICK ADD OWNER MODAL */}
-        <Modal visible={isQuickAddOwnerOpen} transparent animationType="fade">
-          <KeyboardAvoidingView
-            style={styles.modalBackdrop}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
-            <View style={[styles.modalCard, { width: '92%', alignSelf: 'center' }]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle} allowFontScaling={false}>Quick Add Owner</Text>
-                <TouchableOpacity onPress={() => setIsQuickAddOwnerOpen(false)}>
-                  <Ionicons name="close" size={20} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
+                      {activePropDropdown === 'owner' && (
+                        <>
+                          {owners.length === 0 ? (
+                            <View style={{ padding: 16, alignItems: 'center' }}>
+                              <Text style={{ color: colors.textMuted, fontSize: 13 }} allowFontScaling={false}>
+                                No owners found. Please add an owner.
+                              </Text>
+                            </View>
+                          ) : (
+                            owners.map((o) => {
+                              const oId = o.id || o._id;
+                              const isSelected = pOwnerId === oId;
+                              const oName = o.name || `${o.firstName || ''} ${o.lastName || ''}`.trim() || 'Owner';
+                              return (
+                                <TouchableOpacity
+                                  key={oId}
+                                  style={[styles.pickerRow, isSelected && styles.pickerRowSelected]}
+                                  onPress={() => {
+                                    setPOwnerId(oId);
+                                    setActivePropDropdown(null);
+                                  }}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={{ flex: 1, paddingRight: 8 }}>
+                                    <Text
+                                      style={[styles.detailVal, isSelected && { color: colors.primary, fontWeight: '700' }]}
+                                      allowFontScaling={false}
+                                    >
+                                      {oName}
+                                    </Text>
+                                    {o.email && (
+                                      <Text style={{ fontSize: 11, color: colors.textMuted }} allowFontScaling={false}>
+                                        {o.email}
+                                      </Text>
+                                    )}
+                                  </View>
+                                  {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                                </TouchableOpacity>
+                              );
+                            })
+                          )}
+                          <TouchableOpacity
+                            style={[styles.closeBtn, { backgroundColor: '#2563eb', marginTop: 12, borderRadius: 8, paddingVertical: 10 }]}
+                            onPress={() => {
+                              setActivePropDropdown(null);
+                              setIsQuickAddOwnerOpen(true);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.closeBtnText, { color: '#ffffff', fontWeight: '700' }]} allowFontScaling={false}>
+                              + Add New Owner
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
 
-              <View style={{ marginVertical: 12 }}>
-                <Text style={styles.fieldLabel} allowFontScaling={false}>
-                  FULL NAME <Text style={styles.requiredStar}>*</Text>
-                </Text>
-                <TextInput
-                  style={styles.propInput}
-                  placeholder="e.g. John Smith"
-                  placeholderTextColor={colors.placeholder}
-                  value={newOwnerFullName}
-                  onChangeText={setNewOwnerFullName}
-                  allowFontScaling={false}
-                />
+                      {activePropDropdown === 'paymentProvider' &&
+                        PAYMENT_PROVIDERS.map((pr) => {
+                          const isSelected = pPaymentProvider === pr;
+                          return (
+                            <TouchableOpacity
+                              key={pr}
+                              style={[styles.pickerRow, isSelected && styles.pickerRowSelected]}
+                              onPress={() => {
+                                setPPaymentProvider(pr);
+                                setActivePropDropdown(null);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text
+                                style={[styles.detailVal, isSelected && { color: colors.primary, fontWeight: '700' }]}
+                                allowFontScaling={false}
+                              >
+                                {pr}
+                              </Text>
+                              {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                            </TouchableOpacity>
+                          );
+                        })}
+                    </ScrollView>
+                  </View>
+                </View>
+              )}
 
-                <Text style={[styles.fieldLabel, { marginTop: 10 }]} allowFontScaling={false}>
-                  EMAIL <Text style={styles.requiredStar}>*</Text>
-                </Text>
-                <TextInput
-                  style={styles.propInput}
-                  placeholder="e.g. john@example.com"
-                  placeholderTextColor={colors.placeholder}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={newOwnerEmail}
-                  onChangeText={setNewOwnerEmail}
-                  allowFontScaling={false}
-                />
-
-                <Text style={[styles.fieldLabel, { marginTop: 10 }]} allowFontScaling={false}>
-                  PHONE NUMBER
-                </Text>
-                <TextInput
-                  style={styles.propInput}
-                  placeholder="e.g. (512) 555-0199"
-                  placeholderTextColor={colors.placeholder}
-                  keyboardType="phone-pad"
-                  value={newOwnerPhone}
-                  onChangeText={setNewOwnerPhone}
-                  allowFontScaling={false}
-                />
-              </View>
-
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  onPress={() => setIsQuickAddOwnerOpen(false)}
+              {/* ------------------------------------------------------------------ */}
+              {/* IN-MODAL QUICK ADD OWNER OVERLAY (Guaranteed to work on iOS & Android) */}
+              {/* ------------------------------------------------------------------ */}
+              {isQuickAddOwnerOpen && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 100001,
+                    elevation: 100001,
+                    borderRadius: 14,
+                    padding: 16,
+                  }}
                 >
-                  <Text style={styles.cancelBtnText} allowFontScaling={false}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.submitBtn, { backgroundColor: '#2563eb' }]}
-                  onPress={handleQuickAddOwner}
-                  disabled={creatingOwner}
-                >
-                  {creatingOwner ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
-                  ) : (
-                    <Text style={[styles.submitBtnText, { color: '#ffffff' }]} allowFontScaling={false}>
-                      Add Owner
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+                  <TouchableOpacity
+                    style={StyleSheet.absoluteFillObject}
+                    activeOpacity={1}
+                    onPress={() => setIsQuickAddOwnerOpen(false)}
+                  />
+                  <View
+                    style={[
+                      styles.modalCard,
+                      {
+                        width: '100%',
+                        maxWidth: 420,
+                        zIndex: 100002,
+                        elevation: 100002,
+                        backgroundColor: colors.surface,
+                        borderColor: colors.cardBorder,
+                        borderWidth: 1,
+                        padding: 16,
+                        borderRadius: 14,
+                      },
+                    ]}
+                  >
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle} allowFontScaling={false}>Quick Add Owner</Text>
+                      <TouchableOpacity
+                        onPress={() => setIsQuickAddOwnerOpen(false)}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Ionicons name="close" size={20} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={{ marginVertical: 12 }}>
+                      <Text style={styles.fieldLabel} allowFontScaling={false}>
+                        FULL NAME <Text style={styles.requiredStar}>*</Text>
+                      </Text>
+                      <TextInput
+                        style={styles.propInput}
+                        placeholder="e.g. John Smith"
+                        placeholderTextColor={colors.placeholder}
+                        value={newOwnerFullName}
+                        onChangeText={setNewOwnerFullName}
+                        allowFontScaling={false}
+                      />
+
+                      <Text style={[styles.fieldLabel, { marginTop: 10 }]} allowFontScaling={false}>
+                        EMAIL <Text style={styles.requiredStar}>*</Text>
+                      </Text>
+                      <TextInput
+                        style={styles.propInput}
+                        placeholder="e.g. john@example.com"
+                        placeholderTextColor={colors.placeholder}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        value={newOwnerEmail}
+                        onChangeText={setNewOwnerEmail}
+                        allowFontScaling={false}
+                      />
+
+                      <Text style={[styles.fieldLabel, { marginTop: 10 }]} allowFontScaling={false}>
+                        PHONE NUMBER
+                      </Text>
+                      <TextInput
+                        style={styles.propInput}
+                        placeholder="e.g. (512) 555-0199"
+                        placeholderTextColor={colors.placeholder}
+                        keyboardType="phone-pad"
+                        value={newOwnerPhone}
+                        onChangeText={setNewOwnerPhone}
+                        allowFontScaling={false}
+                      />
+                    </View>
+
+                    <View style={styles.modalBtnRow}>
+                      <TouchableOpacity
+                        style={styles.cancelBtn}
+                        onPress={() => setIsQuickAddOwnerOpen(false)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.cancelBtnText} allowFontScaling={false}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.submitBtn, { backgroundColor: '#2563eb' }]}
+                        onPress={handleQuickAddOwner}
+                        disabled={creatingOwner}
+                        activeOpacity={0.8}
+                      >
+                        {creatingOwner ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <Text style={[styles.submitBtnText, { color: '#ffffff' }]} allowFontScaling={false}>
+                            Add Owner
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
             </View>
           </KeyboardAvoidingView>
         </Modal>
@@ -2193,7 +2309,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                     {editingUnitId ? 'Edit Unit' : 'Add Unit'}
                   </Text>
                   <Text style={styles.unitModalSubtitle} allowFontScaling={false}>
-                    {editingUnitId ? 'Update unit configuration and lease details.' : 'Configure unit parameters and resident details.'}
+                    {editingUnitId ? 'Update unit configuration and lease details.' : 'Register single or multiple rentable unit layouts to a property.'}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -2206,37 +2322,70 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               </View>
 
               <ScrollView style={{ flex: 1, marginVertical: 8 }} showsVerticalScrollIndicator={false}>
-                {/* Property Selection */}
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.cleanFieldLabel} allowFontScaling={false}>PROPERTY *</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-                    {properties.map((p) => {
-                      const isActive = uPropId === p.id;
-                      return (
+                {/* Target Property Card (Matching Web 1:1) */}
+                <View style={styles.targetPropCard}>
+                  <View style={styles.targetPropHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="business" size={15} color={colors.primary} />
+                      <Text style={styles.targetPropTitle} allowFontScaling={false}>TARGET PROPERTY</Text>
+                    </View>
+                    {uPropId ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={styles.targetPropBadge}>
+                          <Ionicons name="lock-closed" size={10} color={colors.success} />
+                          <Text style={styles.targetPropBadgeText} allowFontScaling={false}>Selected</Text>
+                        </View>
                         <TouchableOpacity
-                          key={p.id}
-                          style={[styles.unitPropChip, isActive && styles.unitPropChipActive]}
-                          onPress={() => setUPropId(p.id)}
+                          style={styles.changePropBtn}
+                          onPress={() => setShowUnitPropDropdown(true)}
                           activeOpacity={0.7}
                         >
-                          <Ionicons
-                            name="business-outline"
-                            size={13}
-                            color={isActive ? colors.primary : colors.textMuted}
-                            style={{ marginRight: 4 }}
-                          />
-                          <Text
-                            style={[styles.unitPropChipText, isActive && styles.unitPropChipTextActive]}
-                            allowFontScaling={false}
-                          >
-                            {p.name}
-                          </Text>
+                          <Text style={styles.changePropBtnText} allowFontScaling={false}>Change</Text>
                         </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <Text style={styles.cleanFieldLabel} allowFontScaling={false}>PROPERTY *</Text>
+                  <TouchableOpacity
+                    style={[styles.cleanDropdownTrigger, formErrors.propertyId && styles.inputErrorBorder]}
+                    onPress={() => setShowUnitPropDropdown(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                      <Ionicons
+                        name="business-outline"
+                        size={16}
+                        color={uPropId ? colors.primary : colors.placeholder}
+                      />
+                      <Text
+                        style={[styles.cleanDropdownText, !uPropId && { color: colors.placeholder }]}
+                        numberOfLines={1}
+                        allowFontScaling={false}
+                      >
+                        {properties.find((p) => p.id === uPropId)?.name || 'Select Property...'}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
                   {formErrors.propertyId && <Text style={styles.errorText}>{formErrors.propertyId}</Text>}
                 </View>
+
+                {/* IF NO PROPERTY IS SELECTED YET: PLACEHOLDER NOTICE (Matching Web 1:1) */}
+                {!uPropId ? (
+                  <View style={styles.unitEmptyNoticeCard}>
+                    <View style={styles.unitEmptyNoticeIconWrapper}>
+                      <Ionicons name="business" size={24} color={colors.primary} />
+                    </View>
+                    <Text style={styles.unitEmptyNoticeTitle} allowFontScaling={false}>
+                      Select a Target Property First
+                    </Text>
+                    <Text style={styles.unitEmptyNoticeSubtitle} allowFontScaling={false}>
+                      Please select a property from the dropdown above. Once selected, the unit configuration details will unlock automatically.
+                    </Text>
+                  </View>
+                ) : (
+                  <>
 
                 {/* Unit Number & Floor */}
                 <View style={styles.twoColRow}>
@@ -2877,6 +3026,8 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                     </View>
                   </View>
                 )}
+                  </>
+                )}
               </ScrollView>
 
               {/* Fixed Footer Buttons */}
@@ -2889,9 +3040,9 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                   <Text style={styles.unitCancelBtnText} allowFontScaling={false}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.unitSubmitBtn}
+                  style={[styles.unitSubmitBtn, !uPropId && { opacity: 0.5 }]}
                   onPress={handleSaveUnit}
-                  disabled={submitting}
+                  disabled={submitting || !uPropId}
                   activeOpacity={0.8}
                 >
                   {submitting ? (
@@ -2903,6 +3054,115 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                   )}
                 </TouchableOpacity>
               </View>
+
+              {/* ------------------------------------------------------------------ */}
+              {/* IN-MODAL UNIT TARGET PROPERTY DROPDOWN OVERLAY */}
+              {/* ------------------------------------------------------------------ */}
+              {showUnitPropDropdown && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 100001,
+                    elevation: 100001,
+                    borderRadius: 14,
+                    padding: 16,
+                  }}
+                >
+                  <TouchableOpacity
+                    style={StyleSheet.absoluteFillObject}
+                    activeOpacity={1}
+                    onPress={() => setShowUnitPropDropdown(false)}
+                  />
+                  <View
+                    style={[
+                      styles.modalCard,
+                      {
+                        width: '100%',
+                        maxWidth: 420,
+                        maxHeight: '75%',
+                        zIndex: 100002,
+                        elevation: 100002,
+                        backgroundColor: colors.surface,
+                        borderColor: colors.cardBorder,
+                        borderWidth: 1,
+                        padding: 16,
+                        borderRadius: 14,
+                      },
+                    ]}
+                  >
+                    <View style={styles.modalHeader}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="business" size={18} color={colors.primary} />
+                        <Text style={styles.modalTitle} allowFontScaling={false}>
+                          Select Target Property
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setShowUnitPropDropdown(false)}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Ionicons name="close" size={20} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={{ marginVertical: 10 }} showsVerticalScrollIndicator={false}>
+                      {properties.length === 0 ? (
+                        <View style={{ padding: 16, alignItems: 'center' }}>
+                          <Text style={{ color: colors.textMuted, fontSize: 13 }} allowFontScaling={false}>
+                            No properties found. Please create a property first.
+                          </Text>
+                        </View>
+                      ) : (
+                        properties.map((p) => {
+                          const isSelected = uPropId === p.id;
+                          return (
+                            <TouchableOpacity
+                              key={p.id}
+                              style={[styles.pickerRow, isSelected && styles.pickerRowSelected]}
+                              onPress={() => {
+                                setUPropId(p.id);
+                                setFormErrors((prev) => ({ ...prev, propertyId: undefined }));
+                                setShowUnitPropDropdown(false);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text
+                                  style={[styles.detailVal, isSelected && { color: colors.primary, fontWeight: '700' }]}
+                                  allowFontScaling={false}
+                                >
+                                  {p.name}
+                                </Text>
+                                {p.address && (
+                                  <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }} allowFontScaling={false} numberOfLines={1}>
+                                    {formatAddress(p.address)}
+                                  </Text>
+                                )}
+                              </View>
+                              {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                            </TouchableOpacity>
+                          );
+                        })
+                      )}
+                    </ScrollView>
+
+                    <TouchableOpacity
+                      style={styles.closeBtn}
+                      onPress={() => setShowUnitPropDropdown(false)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.closeBtnText} allowFontScaling={false}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
           </KeyboardAvoidingView>
         </Modal>
@@ -4136,6 +4396,113 @@ const getStyles = (colors, isDarkMode) =>
       fontSize: 12.5,
       fontWeight: '700',
       color: '#ffffff',
+    },
+    // Target Property Card (Matching Web 1:1)
+    targetPropCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: 12,
+      marginBottom: 12,
+    },
+    targetPropHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    targetPropTitle: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: colors.primary,
+      letterSpacing: 0.5,
+    },
+    targetPropBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+      borderWidth: 1,
+      borderRadius: 4,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      gap: 3,
+    },
+    targetPropBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.success,
+    },
+    changePropBtn: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: isDarkMode ? '#334155' : '#f1f5f9',
+    },
+    changePropBtnText: {
+      fontSize: 10.5,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
+    cleanDropdownTrigger: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      minHeight: 42,
+    },
+    cleanDropdownText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      flex: 1,
+    },
+    // Empty State Card when no Property Selected (Matching Web 1:1)
+    unitEmptyNoticeCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colors.cardBorder,
+      paddingVertical: 36,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    unitEmptyNoticeIconWrapper: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(2, 132, 199, 0.1)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(2, 132, 199, 0.2)',
+    },
+    unitEmptyNoticeTitle: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginBottom: 6,
+      textAlign: 'center',
+    },
+    unitEmptyNoticeSubtitle: {
+      fontSize: 11.5,
+      color: colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 17,
+      maxWidth: 290,
     },
   });
 
