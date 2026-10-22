@@ -89,7 +89,7 @@ export const TenantDashboard = ({ onNavigate }) => {
       const [metricsRes, leaseRes, leasesRes, profileRes, screeningRes, notifsRes, maintenanceRes] = await Promise.all([
         apiClient.get('/portal/tenant/metrics', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/tenant/lease', logout, refreshAccessToken).catch(() => null),
-        apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => apiClient.get('/leases', logout, refreshAccessToken).catch(() => null)),
+        apiClient.get('/portal/tenant/leases', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/tenant/profile', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/screening/reports', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/tenant/notifications', logout, refreshAccessToken).catch(() => null),
@@ -104,9 +104,10 @@ export const TenantDashboard = ({ onNavigate }) => {
       const notifs = notifsRes?.data || notifsRes || [];
       const maintenance = maintenanceRes?.data || maintenanceRes || [];
 
-      const lease = singleLease || (Array.isArray(allLeases) && allLeases.length > 0 ? allLeases[0] : null);
-      const propName = lease?.property?.name || lease?.propertyName || profile?.companyName || (lease ? 'Property' : 'No Active Lease');
-      const unitNum = lease?.unit?.unitNumber || lease?.unitNumber || profile?.unitNumber || (lease ? 'Unit' : 'N/A');
+      const lease = (singleLease && singleLease.id) ? singleLease : (Array.isArray(allLeases) && allLeases.length > 0 ? allLeases[0] : null);
+      const hasActiveLease = !!lease;
+      const propName = lease?.property?.name || lease?.propertyName || (hasActiveLease ? 'Property' : 'No Active Lease');
+      const unitNum = lease?.unit?.unitNumber ? `Unit ${lease.unit.unitNumber}` : (lease?.unitNumber || (hasActiveLease ? 'Unit' : 'N/A'));
 
       // Match tenant screening report
       const myEmail = user?.email || profile?.email || '';
@@ -142,11 +143,12 @@ export const TenantDashboard = ({ onNavigate }) => {
           user?.name ||
           `${profile.firstName || user?.firstName || ''} ${profile.lastName || user?.lastName || ''}`.trim() ||
           'Resident',
+        hasActiveLease,
         propertyName: propName,
         unitNumber: unitNum,
         currentRent: rentAmount,
         outstandingBalance: outBal,
-        nextDueDate: metrics.nextDueDate && metrics.nextDueDate !== 'N/A' ? String(metrics.nextDueDate).split('T')[0] : (lease ? '1st of next month' : 'N/A'),
+        nextDueDate: metrics.nextDueDate && metrics.nextDueDate !== 'N/A' ? String(metrics.nextDueDate).split('T')[0] : (hasActiveLease ? '1st of next month' : 'N/A'),
         leaseExpiration: metrics.leaseExpiration || (lease?.endDate ? String(lease.endDate).split('T')[0] : 'N/A'),
         activeVisitors: Number(metrics.activeVisitors || 0),
         packagesWaiting: Number(metrics.packagesWaiting || 0),
@@ -511,45 +513,55 @@ export const TenantDashboard = ({ onNavigate }) => {
         </View>
 
         <View style={styles.cardBody}>
-          <View style={styles.leaseGrid}>
-            <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>PROPERTY</Text>
-              <Text style={[styles.leaseBoxVal, { color: colors.textPrimary }]} numberOfLines={1}>
-                {tenantData.propertyName}
-              </Text>
+          {!tenantData.hasActiveLease ? (
+            <View style={{ alignItems: 'center', paddingVertical: 18 }}>
+              <Ionicons name="document-text-outline" size={34} color={colors.textSecondary} style={{ marginBottom: 8 }} />
+              <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '700' }}>No active lease found.</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 11.5, marginTop: 4 }}>You currently have no active residential lease assigned.</Text>
             </View>
+          ) : (
+            <>
+              <View style={styles.leaseGrid}>
+                <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>PROPERTY</Text>
+                  <Text style={[styles.leaseBoxVal, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {tenantData.propertyName}
+                  </Text>
+                </View>
 
-            <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>ASSIGNED UNIT</Text>
-              <Text style={[styles.leaseBoxVal, { color: colors.textPrimary }]} numberOfLines={1}>
-                {tenantData.unitNumber && tenantData.unitNumber !== 'N/A' ? `Unit ${tenantData.unitNumber}` : 'Standard'}
-              </Text>
-            </View>
+                <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>ASSIGNED UNIT</Text>
+                  <Text style={[styles.leaseBoxVal, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {tenantData.unitNumber && tenantData.unitNumber !== 'N/A' ? `Unit ${tenantData.unitNumber}` : 'Standard'}
+                  </Text>
+                </View>
 
-            <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>MONTHLY RENT</Text>
-              <Text style={[styles.leaseBoxVal, { color: '#38bdf8' }]} numberOfLines={1}>
-                ${(tenantData.currentRent || 0).toLocaleString()} / mo
-              </Text>
-            </View>
+                <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>MONTHLY RENT</Text>
+                  <Text style={[styles.leaseBoxVal, { color: '#38bdf8' }]} numberOfLines={1}>
+                    ${(tenantData.currentRent || 0).toLocaleString()} / mo
+                  </Text>
+                </View>
 
-            <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>LEASE EXPIRES</Text>
-              <Text style={[styles.leaseBoxVal, { color: colors.textPrimary }]} numberOfLines={1}>
-                {tenantData.leaseExpiration}
-              </Text>
-            </View>
-          </View>
+                <View style={[styles.leaseBox, { backgroundColor: colors.surface || colors.background, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.leaseBoxLabel, { color: colors.textSecondary }]}>LEASE EXPIRES</Text>
+                  <Text style={[styles.leaseBoxVal, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {tenantData.leaseExpiration}
+                  </Text>
+                </View>
+              </View>
 
-          {onNavigate && (
-            <TouchableOpacity
-              style={[styles.outlineActionBtn, { borderColor: colors.cardBorder, marginTop: 12 }]}
-              onPress={() => onNavigate('lease')}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="document-text-outline" size={15} color="#38bdf8" style={{ marginRight: 6 }} />
-              <Text style={styles.outlineActionText}>Download Signed Agreement PDF</Text>
-            </TouchableOpacity>
+              {onNavigate && (
+                <TouchableOpacity
+                  style={[styles.outlineActionBtn, { borderColor: colors.cardBorder, marginTop: 12 }]}
+                  onPress={() => onNavigate('lease')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="document-text-outline" size={15} color="#38bdf8" style={{ marginRight: 6 }} />
+                  <Text style={styles.outlineActionText}>Download Signed Agreement PDF</Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </View>
       </View>
