@@ -209,18 +209,18 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const [uPropId, setUPropId] = useState('');
   const [uNumber, setUNumber] = useState('');
   const [uFloor, setUFloor] = useState('1');
-  const [uBeds, setUBeds] = useState('2');
-  const [uBaths, setUBaths] = useState('2');
-  const [uSqft, setUSqft] = useState('850');
-  const [uRent, setURent] = useState('1500');
-  const [uDeposit, setUDeposit] = useState('1500');
-  const [uStatus, setUStatus] = useState('Occupied'); // Default Occupied
+  const [uBeds, setUBeds] = useState('');
+  const [uBaths, setUBaths] = useState('');
+  const [uSqft, setUSqft] = useState('');
+  const [uRent, setURent] = useState('');
+  const [uDeposit, setUDeposit] = useState('');
+  const [uStatus, setUStatus] = useState('Vacant');
 
   // Late Fee & Grace Period
   const [uLateFeeEnabled, setULateFeeEnabled] = useState(false);
   const [uLateFeeType, setULateFeeType] = useState('FLAT');
-  const [uLateFeeAmount, setULateFeeAmount] = useState('50');
-  const [uLateFeeGraceDays, setULateFeeGraceDays] = useState('5');
+  const [uLateFeeAmount, setULateFeeAmount] = useState('');
+  const [uLateFeeGraceDays, setULateFeeGraceDays] = useState('');
 
   // Vacant Advertising
   const [uWantToAdvertise, setUWantToAdvertise] = useState('yes');
@@ -228,18 +228,18 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
   // Occupied Tenant Onboarding (Matching Web Screenshot)
   const [uProvideTenantInfo, setUProvideTenantInfo] = useState('now');
-  const [tFirstName, setTFirstName] = useState('John');
-  const [tLastName, setTLastName] = useState('Doe');
+  const [tFirstName, setTFirstName] = useState('');
+  const [tLastName, setTLastName] = useState('');
   const [tPreferredName, setTPreferredName] = useState('');
-  const [tDob, setTDob] = useState('1990-05-15');
+  const [tDob, setTDob] = useState('');
   const [tGender, setTGender] = useState('Male');
-  const [tEmail, setTEmail] = useState('john.doe@example.com');
-  const [tPhone, setTPhone] = useState('(512) 555-0199');
-  const [tAltPhone, setTAltPhone] = useState('(512) 555-4321');
-  const [tPassword, setTPassword] = useState('123456');
+  const [tEmail, setTEmail] = useState('');
+  const [tPhone, setTPhone] = useState('');
+  const [tAltPhone, setTAltPhone] = useState('');
+  const [tPassword, setTPassword] = useState('');
   const [tShowPassword, setTShowPassword] = useState(false);
-  const [tMoveInDate, setTMoveInDate] = useState('2026-01-23');
-  const [tInvoiceStartDate, setTInvoiceStartDate] = useState('2026-01-21');
+  const [tMoveInDate, setTMoveInDate] = useState('');
+  const [tInvoiceStartDate, setTInvoiceStartDate] = useState('');
   const [tOutstandingBalance, setTOutstandingBalance] = useState('0');
 
   // Calendar Date Picker Modal States
@@ -617,31 +617,31 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
     setUPropId(preselectedPropId || properties[0]?.id || '');
     setUNumber('');
     setUFloor('1');
-    setUBeds('2');
-    setUBaths('2');
-    setUSqft('850');
-    setURent('1500');
-    setUDeposit('1500');
-    setUStatus('Occupied'); // Default Occupied matching Web
+    setUBeds('');
+    setUBaths('');
+    setUSqft('');
+    setURent('');
+    setUDeposit('');
+    setUStatus('Vacant'); // Clean Vacant by default
 
     setULateFeeEnabled(false);
     setULateFeeType('FLAT');
-    setULateFeeAmount('50');
-    setULateFeeGraceDays('5');
+    setULateFeeAmount('');
+    setULateFeeGraceDays('');
 
     setUProvideTenantInfo('now');
-    setTFirstName('John');
-    setTLastName('Doe');
+    setTFirstName('');
+    setTLastName('');
     setTPreferredName('');
     setTDob('');
     setTGender('Male');
-    setTEmail('john.doe@example.com');
-    setTPhone('(512) 555-0199');
-    setTAltPhone('(512) 555-4321');
-    setTPassword('123456');
+    setTEmail('');
+    setTPhone('');
+    setTAltPhone('');
+    setTPassword('');
     setTShowPassword(false);
-    setTMoveInDate('01/23/2026');
-    setTInvoiceStartDate('01/21/2026');
+    setTMoveInDate('');
+    setTInvoiceStartDate('');
     setTOutstandingBalance('0');
 
     setIncludeMonthlyLateFee(false);
@@ -664,18 +664,18 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
     setEditingUnitId(unit.id);
     setUPropId(unit.propertyId || properties[0]?.id || '');
     setUNumber(String(unit.unitNumber || ''));
-    setUFloor(String(unit.floor || 1));
-    setUBeds(String(unit.bedrooms || 2));
-    setUBaths(String(unit.bathrooms || 2));
-    setUSqft(String(unit.squareFootage || 850));
-    setURent(String(unit.rentAmount || 1500));
-    setUDeposit(String(unit.securityDeposit || 1500));
+    setUFloor(String(unit.floor || '1'));
+    setUBeds(unit.bedrooms !== undefined && unit.bedrooms !== null ? String(unit.bedrooms) : '');
+    setUBaths(unit.bathrooms !== undefined && unit.bathrooms !== null ? String(unit.bathrooms) : '');
+    setUSqft(unit.squareFootage !== undefined && unit.squareFootage !== null ? String(unit.squareFootage) : '');
+    setURent(unit.rentAmount !== undefined && unit.rentAmount !== null ? String(unit.rentAmount) : '');
+    setUDeposit(unit.securityDeposit !== undefined && unit.securityDeposit !== null ? String(unit.securityDeposit) : '');
     setUStatus(unit.status || 'Vacant');
 
     setULateFeeEnabled(Boolean(unit.isLateFeeEnabled));
     setULateFeeType(unit.lateFeeType || 'FLAT');
-    setULateFeeAmount(String(unit.lateFeeAmount || 50));
-    setULateFeeGraceDays(String(unit.lateFeeGraceDays || 5));
+    setULateFeeAmount(unit.lateFeeAmount ? String(unit.lateFeeAmount) : '');
+    setULateFeeGraceDays(unit.lateFeeGraceDays ? String(unit.lateFeeGraceDays) : '');
 
     setUProvideTenantInfo('now');
 
@@ -695,8 +695,8 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
     setEditingTenantId(tId);
 
     if (existingT) {
-      setTFirstName(existingT.firstName || 'John');
-      setTLastName(existingT.lastName || 'Doe');
+      setTFirstName(existingT.firstName || '');
+      setTLastName(existingT.lastName || '');
       setTPreferredName(existingT.preferredName || '');
       setTDob(existingT.dob ? String(existingT.dob).split('T')[0] : '');
 
@@ -705,12 +705,12 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       const resolvedGender = normalizeGender(cachedG || unitCachedG || existingT.gender || (['Male', 'Female', 'Other'].includes(existingT.nationality) ? existingT.nationality : null) || 'Male');
       setTGender(resolvedGender);
 
-      setTEmail(existingT.email || 'john.doe@example.com');
-      setTPhone(existingT.phone || '(512) 555-0199');
-      setTAltPhone(existingT.altPhone || '(512) 555-4321');
-      setTPassword('123456');
-      setTMoveInDate(existingT.moveInDate ? String(existingT.moveInDate).split('T')[0] : '01/23/2026');
-      setTInvoiceStartDate(existingT.invoiceStartDate ? String(existingT.invoiceStartDate).split('T')[0] : (existingT.moveInDate ? String(existingT.moveInDate).split('T')[0] : '01/21/2026'));
+      setTEmail(existingT.email || '');
+      setTPhone(existingT.phone || '');
+      setTAltPhone(existingT.altPhone || '');
+      setTPassword('');
+      setTMoveInDate(existingT.moveInDate ? String(existingT.moveInDate).split('T')[0] : '');
+      setTInvoiceStartDate(existingT.invoiceStartDate ? String(existingT.invoiceStartDate).split('T')[0] : (existingT.moveInDate ? String(existingT.moveInDate).split('T')[0] : ''));
       setTOutstandingBalance(String(existingT.openingBalance ?? existingT.previousBalance ?? '0'));
       setTSsn(existingT.ssn || '');
       setTIdType(existingT.idType || 'Driver License');
@@ -720,17 +720,17 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       setTEmployer(existingT.employer || '');
       setTEmployerPhone(existingT.employerPhone || '');
     } else {
-      setTFirstName('John');
-      setTLastName('Doe');
+      setTFirstName('');
+      setTLastName('');
       setTPreferredName('');
       setTDob('');
       setTGender('Male');
-      setTEmail('john.doe@example.com');
-      setTPhone('(512) 555-0199');
-      setTAltPhone('(512) 555-4321');
-      setTPassword('123456');
-      setTMoveInDate('01/23/2026');
-      setTInvoiceStartDate('01/21/2026');
+      setTEmail('');
+      setTPhone('');
+      setTAltPhone('');
+      setTPassword('');
+      setTMoveInDate('');
+      setTInvoiceStartDate('');
       setTOutstandingBalance('0');
       setTSsn('');
       setTIdType('Driver License');
@@ -779,11 +779,11 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       propertyId: uPropId,
       unitNumber: uNumber.trim(),
       floor: Number(uFloor) || 1,
-      bedrooms: Number(uBeds) || 2,
-      bathrooms: Number(uBaths) || 2,
-      squareFootage: Number(uSqft) || 850,
-      rentAmount: Number(uRent) || 1500,
-      securityDeposit: Number(uDeposit) || 1500,
+      bedrooms: Number(uBeds) || 0,
+      bathrooms: Number(uBaths) || 0,
+      squareFootage: Number(uSqft) || 0,
+      rentAmount: Number(uRent) || 0,
+      securityDeposit: Number(uDeposit) || 0,
       status: uStatus,
       propertyName: selectedProp ? selectedProp.name : 'Property',
       isLateFeeEnabled: uLateFeeEnabled,
@@ -806,8 +806,8 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               firstName: tFirstName.trim(),
               lastName: tLastName.trim(),
               preferredName: tPreferredName.trim() || undefined,
-              email: tEmail.trim() || 'john.doe@example.com',
-              phone: tPhone.trim() || '(512) 555-0199',
+              email: tEmail.trim() || undefined,
+              phone: tPhone.trim() || undefined,
               altPhone: tAltPhone.trim() || undefined,
               dob: tDob || undefined,
               gender: finalGender,
@@ -871,10 +871,10 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               firstName: tFirstName.trim(),
               lastName: tLastName.trim(),
               preferredName: tPreferredName.trim() || undefined,
-              email: tEmail.trim() || `${tFirstName.toLowerCase()}@example.com`,
-              phone: tPhone.trim() || '(512) 555-0199',
+              email: tEmail.trim() || undefined,
+              phone: tPhone.trim() || undefined,
               altPhone: tAltPhone.trim() || undefined,
-              password: tPassword || '123456',
+              password: tPassword.trim() || '123456',
               dob: tDob || undefined,
               gender: finalGender,
               nationality: finalGender,
@@ -2213,90 +2213,199 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
         {/* -------------------------------------------------------------------------- */}
         <Modal visible={isUnitModalOpen} animationType="slide" transparent>
           <KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={[styles.modalCard, { maxHeight: '92%' }]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle} allowFontScaling={false}>
-                  {editingUnitId ? 'Edit Unit' : 'Add Unit'}
-                </Text>
-                <TouchableOpacity onPress={() => setIsUnitModalOpen(false)}>
-                  <Ionicons name="close" size={24} color={colors.textMuted} />
+            <View style={[styles.modalCard, styles.unitFullModalCard]}>
+              {/* Header */}
+              <View style={styles.modalHeaderClean}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={styles.unitModalTitle} allowFontScaling={false}>
+                    {editingUnitId ? 'Edit Unit' : 'Add Unit'}
+                  </Text>
+                  <Text style={styles.unitModalSubtitle} allowFontScaling={false}>
+                    {editingUnitId ? 'Update unit configuration and lease details.' : 'Configure unit parameters and resident details.'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.unitCloseBtn}
+                  onPress={() => setIsUnitModalOpen(false)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ marginVertical: 10 }} showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ flex: 1, marginVertical: 8 }} showsVerticalScrollIndicator={false}>
                 {/* Property Selection */}
-                <Text style={styles.inputLabel} allowFontScaling={false}>Property *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
-                  {properties.map((p) => (
-                    <TouchableOpacity key={p.id} style={[styles.chip, uPropId === p.id && styles.chipActive]} onPress={() => setUPropId(p.id)}>
-                      <Text style={[styles.chipText, uPropId === p.id && styles.chipTextActive]} allowFontScaling={false}>{p.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                {formErrors.propertyId && <Text style={styles.errorText}>{formErrors.propertyId}</Text>}
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.cleanFieldLabel} allowFontScaling={false}>PROPERTY *</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+                    {properties.map((p) => {
+                      const isActive = uPropId === p.id;
+                      return (
+                        <TouchableOpacity
+                          key={p.id}
+                          style={[styles.unitPropChip, isActive && styles.unitPropChipActive]}
+                          onPress={() => setUPropId(p.id)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name="business-outline"
+                            size={13}
+                            color={isActive ? colors.primary : colors.textMuted}
+                            style={{ marginRight: 4 }}
+                          />
+                          <Text
+                            style={[styles.unitPropChipText, isActive && styles.unitPropChipTextActive]}
+                            allowFontScaling={false}
+                          >
+                            {p.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  {formErrors.propertyId && <Text style={styles.errorText}>{formErrors.propertyId}</Text>}
+                </View>
 
                 {/* Unit Number & Floor */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel} allowFontScaling={false}>Unit Number *</Text>
-                    <TextInput style={styles.input} placeholder="101" placeholderTextColor={colors.placeholder} value={uNumber} onChangeText={setUNumber} allowFontScaling={false} />
+                <View style={styles.twoColRow}>
+                  <View style={styles.twoColField}>
+                    <Text style={styles.cleanFieldLabel} allowFontScaling={false}>UNIT NUMBER *</Text>
+                    <TextInput
+                      style={[styles.cleanInput, formErrors.unitNumber && styles.inputErrorBorder]}
+                      placeholder="e.g. 101"
+                      placeholderTextColor={colors.placeholder}
+                      value={uNumber}
+                      onChangeText={setUNumber}
+                      allowFontScaling={false}
+                    />
                     {formErrors.unitNumber && <Text style={styles.errorText}>{formErrors.unitNumber}</Text>}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel} allowFontScaling={false}>Floor</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" placeholder="1" placeholderTextColor={colors.placeholder} value={uFloor} onChangeText={setUFloor} allowFontScaling={false} />
+                  <View style={styles.twoColField}>
+                    <Text style={styles.cleanFieldLabel} allowFontScaling={false}>FLOOR</Text>
+                    <TextInput
+                      style={styles.cleanInput}
+                      keyboardType="numeric"
+                      placeholder="1"
+                      placeholderTextColor={colors.placeholder}
+                      value={uFloor}
+                      onChangeText={setUFloor}
+                      allowFontScaling={false}
+                    />
                   </View>
                 </View>
 
                 {/* Beds & Baths */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel} allowFontScaling={false}>Bedrooms</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" placeholder="2" placeholderTextColor={colors.placeholder} value={uBeds} onChangeText={setUBeds} allowFontScaling={false} />
+                <View style={styles.twoColRow}>
+                  <View style={styles.twoColField}>
+                    <Text style={styles.cleanFieldLabel} allowFontScaling={false}>BEDROOMS</Text>
+                    <TextInput
+                      style={styles.cleanInput}
+                      keyboardType="numeric"
+                      placeholder="e.g. 2"
+                      placeholderTextColor={colors.placeholder}
+                      value={uBeds}
+                      onChangeText={setUBeds}
+                      allowFontScaling={false}
+                    />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel} allowFontScaling={false}>Bathrooms</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" placeholder="2" placeholderTextColor={colors.placeholder} value={uBaths} onChangeText={setUBaths} allowFontScaling={false} />
+                  <View style={styles.twoColField}>
+                    <Text style={styles.cleanFieldLabel} allowFontScaling={false}>BATHROOMS</Text>
+                    <TextInput
+                      style={styles.cleanInput}
+                      keyboardType="numeric"
+                      placeholder="e.g. 2"
+                      placeholderTextColor={colors.placeholder}
+                      value={uBaths}
+                      onChangeText={setUBaths}
+                      allowFontScaling={false}
+                    />
                   </View>
                 </View>
 
                 {/* Rent & Deposit */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel} allowFontScaling={false}>Monthly Rent ($) *</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" placeholder="1500" placeholderTextColor={colors.placeholder} value={uRent} onChangeText={setURent} allowFontScaling={false} />
+                <View style={styles.twoColRow}>
+                  <View style={styles.twoColField}>
+                    <Text style={styles.cleanFieldLabel} allowFontScaling={false}>MONTHLY RENT ($) *</Text>
+                    <TextInput
+                      style={styles.cleanInput}
+                      keyboardType="numeric"
+                      placeholder="e.g. 1500"
+                      placeholderTextColor={colors.placeholder}
+                      value={uRent}
+                      onChangeText={setURent}
+                      allowFontScaling={false}
+                    />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel} allowFontScaling={false}>Security Deposit ($)</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" placeholder="1500" placeholderTextColor={colors.placeholder} value={uDeposit} onChangeText={setUDeposit} allowFontScaling={false} />
+                  <View style={styles.twoColField}>
+                    <Text style={styles.cleanFieldLabel} allowFontScaling={false}>SECURITY DEPOSIT ($)</Text>
+                    <TextInput
+                      style={styles.cleanInput}
+                      keyboardType="numeric"
+                      placeholder="e.g. 1500"
+                      placeholderTextColor={colors.placeholder}
+                      value={uDeposit}
+                      onChangeText={setUDeposit}
+                      allowFontScaling={false}
+                    />
                   </View>
                 </View>
 
                 {/* Status Selection */}
-                <Text style={[styles.inputLabel, { marginTop: 12 }]} allowFontScaling={false}>Status *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-                  {UNIT_STATUSES.map((st) => (
-                    <TouchableOpacity
-                      key={st}
-                      style={[styles.chip, uStatus === st && styles.chipActive]}
-                      onPress={() => setUStatus(st)}
-                    >
-                      <Text style={[styles.chipText, uStatus === st && styles.chipTextActive]} allowFontScaling={false}>
-                        {st}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                <View style={{ marginTop: 12, marginBottom: 8 }}>
+                  <Text style={styles.cleanFieldLabel} allowFontScaling={false}>STATUS *</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+                    {UNIT_STATUSES.map((st) => {
+                      const isActive = uStatus === st;
+                      const isOccupied = st === 'Occupied';
+                      return (
+                        <TouchableOpacity
+                          key={st}
+                          style={[
+                            styles.unitStatusChip,
+                            isActive && (isOccupied ? styles.unitStatusChipOccupied : styles.unitStatusChipActive)
+                          ]}
+                          onPress={() => setUStatus(st)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={
+                              isOccupied ? "person-circle" :
+                              st === 'Vacant' ? "radio-button-off" :
+                              st === 'Under Maintenance' ? "construct-outline" : "ellipse"
+                            }
+                            size={13}
+                            color={
+                              isActive
+                                ? (isOccupied ? colors.success : colors.primary)
+                                : colors.textMuted
+                            }
+                            style={{ marginRight: 4 }}
+                          />
+                          <Text
+                            style={[
+                              styles.unitStatusChipText,
+                              isActive && (isOccupied ? { color: colors.success, fontWeight: '700' } : styles.unitStatusChipTextActive)
+                            ]}
+                            allowFontScaling={false}
+                          >
+                            {st}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
 
-                {/* LATE FEE & GRACE PERIOD (Matching Web Screenshot) */}
-                <View style={styles.sectionBox}>
+                {/* LATE FEE & GRACE PERIOD (OPTIONAL) */}
+                <View style={styles.sectionCard}>
                   <TouchableOpacity
-                    style={styles.toggleRow}
+                    style={styles.sectionCardHeader}
                     onPress={() => setULateFeeEnabled(!uLateFeeEnabled)}
+                    activeOpacity={0.7}
                   >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.sectionBoxTitle} allowFontScaling={false}>LATE FEE & GRACE PERIOD (OPTIONAL)</Text>
-                      <Text style={styles.cardAddress} allowFontScaling={false}>Set automated overdue penalty rules specifically for this unit</Text>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.sectionCardTitle} allowFontScaling={false}>LATE FEE & GRACE PERIOD</Text>
+                      <Text style={styles.sectionCardSubtitle} allowFontScaling={false}>Automated overdue penalty rules for this unit</Text>
                     </View>
                     <View style={[styles.toggleBadge, uLateFeeEnabled && styles.toggleBadgeActive]}>
                       <Text style={[styles.toggleBadgeText, uLateFeeEnabled && styles.toggleBadgeTextActive]} allowFontScaling={false}>
@@ -2306,175 +2415,186 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                   </TouchableOpacity>
 
                   {uLateFeeEnabled && (
-                    <View style={{ marginTop: 8 }}>
-                      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                    <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.cardBorder }}>
+                      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
                         <TouchableOpacity
-                          style={[styles.chip, uLateFeeType === 'FLAT' && styles.chipActive]}
+                          style={[styles.unitPropChip, uLateFeeType === 'FLAT' && styles.unitPropChipActive, { flex: 1, justifyContent: 'center' }]}
                           onPress={() => setULateFeeType('FLAT')}
                         >
-                          <Text style={[styles.chipText, uLateFeeType === 'FLAT' && styles.chipTextActive]} allowFontScaling={false}>Flat ($)</Text>
+                          <Text style={[styles.unitPropChipText, uLateFeeType === 'FLAT' && styles.unitPropChipTextActive]} allowFontScaling={false}>Flat ($)</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={[styles.chip, uLateFeeType === 'PERCENTAGE' && styles.chipActive]}
+                          style={[styles.unitPropChip, uLateFeeType === 'PERCENTAGE' && styles.unitPropChipActive, { flex: 1, justifyContent: 'center' }]}
                           onPress={() => setULateFeeType('PERCENTAGE')}
                         >
-                          <Text style={[styles.chipText, uLateFeeType === 'PERCENTAGE' && styles.chipTextActive]} allowFontScaling={false}>Percentage (%)</Text>
+                          <Text style={[styles.unitPropChipText, uLateFeeType === 'PERCENTAGE' && styles.unitPropChipTextActive]} allowFontScaling={false}>Percentage (%)</Text>
                         </TouchableOpacity>
                       </View>
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.inputLabel} allowFontScaling={false}>Fee Amount</Text>
-                          <TextInput style={styles.input} keyboardType="numeric" placeholder="50" placeholderTextColor={colors.placeholder} value={uLateFeeAmount} onChangeText={setULateFeeAmount} allowFontScaling={false} />
+                      <View style={styles.twoColRow}>
+                        <View style={styles.twoColField}>
+                          <Text style={styles.cleanFieldLabel} allowFontScaling={false}>FEE AMOUNT</Text>
+                          <TextInput style={styles.cleanInput} keyboardType="numeric" placeholder="50" placeholderTextColor={colors.placeholder} value={uLateFeeAmount} onChangeText={setULateFeeAmount} allowFontScaling={false} />
                         </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.inputLabel} allowFontScaling={false}>Grace Days</Text>
-                          <TextInput style={styles.input} keyboardType="numeric" placeholder="5" placeholderTextColor={colors.placeholder} value={uLateFeeGraceDays} onChangeText={setULateFeeGraceDays} allowFontScaling={false} />
+                        <View style={styles.twoColField}>
+                          <Text style={styles.cleanFieldLabel} allowFontScaling={false}>GRACE DAYS</Text>
+                          <TextInput style={styles.cleanInput} keyboardType="numeric" placeholder="5" placeholderTextColor={colors.placeholder} value={uLateFeeGraceDays} onChangeText={setULateFeeGraceDays} allowFontScaling={false} />
                         </View>
                       </View>
                     </View>
                   )}
                 </View>
 
-                {/* ------------------------------------------------------------------ */}
-                {/* OCCUPIED TENANT ONBOARDING SECTION (Matching Web Screenshots 1:1) */}
-                {/* ------------------------------------------------------------------ */}
+                {/* OCCUPIED TENANT ONBOARDING SECTION */}
                 {uStatus === 'Occupied' && (
-                  <View style={[styles.sectionBox, { borderColor: colors.primary, marginTop: 12 }]}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <Text style={[styles.sectionBoxTitle, { color: colors.primary }]} allowFontScaling={false}>
-                        OCCUPIED TENANT INFORMATION
-                      </Text>
-                      <View style={[styles.badge, styles.badgeActive]}>
-                        <Text style={[styles.badgeText, styles.badgeTextActive]} allowFontScaling={false}>ACTIVE RESIDENT</Text>
+                  <View style={[styles.sectionCard, { borderColor: colors.primary, borderWidth: 1.5, marginTop: 12 }]}>
+                    <View style={styles.occupiedHeaderRow}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <Ionicons name="person-circle" size={16} color={colors.primary} />
+                          <Text style={styles.occupiedSectionTitle} allowFontScaling={false} numberOfLines={1}>
+                            OCCUPIED TENANT INFO
+                          </Text>
+                        </View>
+                        <Text style={styles.sectionCardSubtitle} allowFontScaling={false} numberOfLines={1}>
+                          Auto-generates lease & completed move-in
+                        </Text>
+                      </View>
+                      <View style={styles.activeResidentBadge}>
+                        <View style={styles.statusDotGreen} />
+                        <Text style={styles.activeResidentBadgeText} allowFontScaling={false}>ACTIVE RESIDENT</Text>
                       </View>
                     </View>
-                    <Text style={styles.cardAddress} allowFontScaling={false}>
-                      Register existing resident details to auto-generate lease & completed move-in
-                    </Text>
 
                     {/* PERSONAL INFORMATION */}
-                    <Text style={[styles.subSectionHeader, { marginTop: 14 }]} allowFontScaling={false}>
-                      PERSONAL INFORMATION
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel} allowFontScaling={false}>FIRST NAME *</Text>
-                        <TextInput style={styles.input} placeholder="John" placeholderTextColor={colors.placeholder} value={tFirstName} onChangeText={setTFirstName} allowFontScaling={false} />
+                    <View style={styles.subSectionDivider}>
+                      <Text style={styles.subSectionTitle} allowFontScaling={false}>PERSONAL INFORMATION</Text>
+                    </View>
+
+                    <View style={styles.twoColRow}>
+                      <View style={styles.twoColField}>
+                        <Text style={styles.cleanFieldLabel} allowFontScaling={false}>FIRST NAME *</Text>
+                        <TextInput style={styles.cleanInput} placeholder="e.g. John" placeholderTextColor={colors.placeholder} value={tFirstName} onChangeText={setTFirstName} allowFontScaling={false} />
                         {formErrors.tFirstName && <Text style={styles.errorText}>{formErrors.tFirstName}</Text>}
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel} allowFontScaling={false}>LAST NAME *</Text>
-                        <TextInput style={styles.input} placeholder="Doe" placeholderTextColor={colors.placeholder} value={tLastName} onChangeText={setTLastName} allowFontScaling={false} />
+                      <View style={styles.twoColField}>
+                        <Text style={styles.cleanFieldLabel} allowFontScaling={false}>LAST NAME *</Text>
+                        <TextInput style={styles.cleanInput} placeholder="e.g. Doe" placeholderTextColor={colors.placeholder} value={tLastName} onChangeText={setTLastName} allowFontScaling={false} />
                         {formErrors.tLastName && <Text style={styles.errorText}>{formErrors.tLastName}</Text>}
                       </View>
                     </View>
 
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel} allowFontScaling={false}>PREFERRED NAME</Text>
-                        <TextInput style={styles.input} placeholder="Johnny" placeholderTextColor={colors.placeholder} value={tPreferredName} onChangeText={setTPreferredName} allowFontScaling={false} />
+                    <View style={styles.twoColRow}>
+                      <View style={styles.twoColField}>
+                        <Text style={styles.cleanFieldLabel} allowFontScaling={false}>PREFERRED NAME</Text>
+                        <TextInput style={styles.cleanInput} placeholder="e.g. Johnny" placeholderTextColor={colors.placeholder} value={tPreferredName} onChangeText={setTPreferredName} allowFontScaling={false} />
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel} allowFontScaling={false}>GENDER</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={styles.twoColField}>
+                        <Text style={styles.cleanFieldLabel} allowFontScaling={false}>GENDER</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                           {GENDERS.map((g) => (
-                            <TouchableOpacity key={g} style={[styles.chip, normalizeGender(tGender) === g && styles.chipActive]} onPress={() => setTGender(g)}>
-                              <Text style={[styles.chipText, normalizeGender(tGender) === g && styles.chipTextActive]} allowFontScaling={false}>{g}</Text>
+                            <TouchableOpacity
+                              key={g}
+                              style={[styles.unitPropChip, normalizeGender(tGender) === g && styles.unitPropChipActive, { paddingHorizontal: 9, paddingVertical: 6 }]}
+                              onPress={() => setTGender(g)}
+                            >
+                              <Text style={[styles.unitPropChipText, normalizeGender(tGender) === g && styles.unitPropChipTextActive]} allowFontScaling={false}>{g}</Text>
                             </TouchableOpacity>
                           ))}
                         </ScrollView>
                       </View>
                     </View>
 
-                    <View style={{ marginTop: 8 }}>
-                      <Text style={styles.inputLabel} allowFontScaling={false}>DATE OF BIRTH (YYYY-MM-DD)</Text>
+                    <View style={{ marginTop: 10 }}>
+                      <Text style={styles.cleanFieldLabel} allowFontScaling={false}>DATE OF BIRTH (YYYY-MM-DD)</Text>
                       <TouchableOpacity
-                        style={styles.datePickerBtn}
+                        style={styles.cleanDatePickerBtn}
                         onPress={() => setShowDobPicker(true)}
                         activeOpacity={0.7}
                       >
-                        <Text style={[styles.datePickerBtnText, !tDob && { color: colors.placeholder }]} allowFontScaling={false}>
-                          {tDob || '1990-05-15'}
+                        <Text style={[styles.cleanDatePickerText, !tDob && { color: colors.placeholder }]} allowFontScaling={false}>
+                          {tDob || 'Select Date of Birth'}
                         </Text>
                         <Ionicons name="calendar-outline" size={16} color={colors.primary} />
                       </TouchableOpacity>
                       <CustomDatePicker
                         visible={showDobPicker}
-                        value={tDob || '1990-05-15'}
+                        value={tDob || '2000-01-01'}
                         onSelect={(date) => setTDob(date)}
                         onClose={() => setShowDobPicker(false)}
                       />
                     </View>
 
-                    {/* CONTACT & TENANT PORTAL CREDENTIALS (Matches Web Screenshot 1:1) */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
-                      <Text style={styles.subSectionHeader} allowFontScaling={false}>
-                        CONTACT & TENANT PORTAL CREDENTIALS
-                      </Text>
-                      <TouchableOpacity onPress={() => Alert.alert('Tenant Portal', 'Resident will receive credentials to login to the Tenant Portal.')}>
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary, letterSpacing: 0.3 }} allowFontScaling={false}>
-                          DASHBOARD ACCESS SETUP
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                    <View style={{ marginTop: 6 }}>
-                      <Text style={styles.inputLabel} allowFontScaling={false}>EMAIL ADDRESS *</Text>
-                      <TextInput style={styles.input} keyboardType="email-address" placeholder="john.doe@example.com" placeholderTextColor={colors.placeholder} value={tEmail} onChangeText={setTEmail} autoCapitalize="none" allowFontScaling={false} />
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel} allowFontScaling={false}>MOBILE PHONE *</Text>
-                        <TextInput style={styles.input} keyboardType="phone-pad" placeholder="(512) 555-0199" placeholderTextColor={colors.placeholder} value={tPhone} onChangeText={setTPhone} allowFontScaling={false} />
+                    {/* CONTACT & PORTAL ACCESS */}
+                    <View style={styles.subSectionDivider}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                        <Text style={styles.subSectionTitle} allowFontScaling={false}>CONTACT & PORTAL ACCESS</Text>
+                        <View style={styles.portalAccessBadge}>
+                          <Ionicons name="key-outline" size={11} color={colors.primary} />
+                          <Text style={styles.portalAccessBadgeText} allowFontScaling={false}>PORTAL READY</Text>
+                        </View>
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel} allowFontScaling={false}>ALTERNATE PHONE</Text>
-                        <TextInput style={styles.input} keyboardType="phone-pad" placeholder="(512) 555-4321" placeholderTextColor={colors.placeholder} value={tAltPhone} onChangeText={setTAltPhone} allowFontScaling={false} />
+                    </View>
+
+                    <View style={{ marginTop: 4 }}>
+                      <Text style={styles.cleanFieldLabel} allowFontScaling={false}>EMAIL ADDRESS *</Text>
+                      <TextInput style={styles.cleanInput} keyboardType="email-address" placeholder="e.g. john@example.com" placeholderTextColor={colors.placeholder} value={tEmail} onChangeText={setTEmail} autoCapitalize="none" allowFontScaling={false} />
+                    </View>
+
+                    <View style={styles.twoColRow}>
+                      <View style={styles.twoColField}>
+                        <Text style={styles.cleanFieldLabel} allowFontScaling={false}>MOBILE PHONE *</Text>
+                        <TextInput style={styles.cleanInput} keyboardType="phone-pad" placeholder="(512) 555-0199" placeholderTextColor={colors.placeholder} value={tPhone} onChangeText={setTPhone} allowFontScaling={false} />
+                      </View>
+                      <View style={styles.twoColField}>
+                        <Text style={styles.cleanFieldLabel} allowFontScaling={false}>ALTERNATE PHONE</Text>
+                        <TextInput style={styles.cleanInput} keyboardType="phone-pad" placeholder="(512) 555-4321" placeholderTextColor={colors.placeholder} value={tAltPhone} onChangeText={setTAltPhone} allowFontScaling={false} />
                       </View>
                     </View>
                     {formErrors.tContact && <Text style={styles.errorText}>{formErrors.tContact}</Text>}
 
-                    <View style={{ marginTop: 8 }}>
-                      <Text style={styles.inputLabel} allowFontScaling={false}>TENANT PASSWORD *</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ marginTop: 10 }}>
+                      <Text style={styles.cleanFieldLabel} allowFontScaling={false}>TENANT PORTAL PASSWORD *</Text>
+                      <View style={styles.passwordContainer}>
                         <TextInput
-                          style={[styles.input, { flex: 1 }]}
+                          style={styles.passwordInput}
                           secureTextEntry={!tShowPassword}
-                          placeholder="••••••"
+                          placeholder="••••••••"
                           placeholderTextColor={colors.placeholder}
                           value={tPassword}
                           onChangeText={setTPassword}
                           allowFontScaling={false}
                         />
-                        <TouchableOpacity style={{ padding: 8 }} onPress={() => setTShowPassword(!tShowPassword)}>
-                          <Ionicons name={tShowPassword ? 'eye-off' : 'eye'} size={20} color={colors.textMuted} />
+                        <TouchableOpacity style={styles.passwordEyeBtn} onPress={() => setTShowPassword(!tShowPassword)}>
+                          <Ionicons name={tShowPassword ? 'eye-off' : 'eye'} size={18} color={colors.textMuted} />
                         </TouchableOpacity>
                       </View>
                     </View>
 
-                    {/* TENANCY DATES & OUTSTANDING BALANCE (Matches Web Screenshot 1:1) */}
-                    <Text style={[styles.subSectionHeader, { marginTop: 14 }]} allowFontScaling={false}>
-                      TENANCY DATES & OUTSTANDING BALANCE
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                      <View style={{ flex: 1 }}>
+                    {/* TENANCY DATES & OUTSTANDING BALANCE */}
+                    <View style={styles.subSectionDivider}>
+                      <Text style={styles.subSectionTitle} allowFontScaling={false}>TENANCY DATES & OUTSTANDING BALANCE</Text>
+                    </View>
+
+                    <View style={styles.twoColRow}>
+                      <View style={styles.twoColField}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                           <Ionicons name="calendar-outline" size={13} color={colors.primary} style={{ marginRight: 4 }} />
-                          <Text style={[styles.inputLabel, { marginBottom: 0 }]} allowFontScaling={false}>MOVE-IN DATE *</Text>
+                          <Text style={[styles.cleanFieldLabel, { marginBottom: 0 }]} allowFontScaling={false} numberOfLines={1}>MOVE-IN DATE *</Text>
                         </View>
                         <TouchableOpacity
-                          style={styles.datePickerBtn}
+                          style={styles.cleanDatePickerBtn}
                           onPress={() => setShowMoveInPicker(true)}
                           activeOpacity={0.7}
                         >
-                          <Text style={[styles.datePickerBtnText, !tMoveInDate && { color: colors.placeholder }]} allowFontScaling={false}>
-                            {tMoveInDate || '2026-01-23'}
+                          <Text style={[styles.cleanDatePickerText, !tMoveInDate && { color: colors.placeholder }]} numberOfLines={1} allowFontScaling={false}>
+                            {tMoveInDate || 'Select Date'}
                           </Text>
-                          <Ionicons name="calendar" size={16} color={colors.primary} />
+                          <Ionicons name="calendar" size={15} color={colors.primary} />
                         </TouchableOpacity>
-                        <Text style={styles.helperText} allowFontScaling={false}>Date tenant resides from</Text>
+                        <Text style={styles.cleanHelperText} allowFontScaling={false} numberOfLines={1}>Resident residing from</Text>
                         <CustomDatePicker
                           visible={showMoveInPicker}
-                          value={tMoveInDate || '2026-01-23'}
+                          value={tMoveInDate || new Date().toISOString().split('T')[0]}
                           onSelect={(date) => {
                             setTMoveInDate(date);
                             if (!tInvoiceStartDate || tInvoiceStartDate === tMoveInDate) {
@@ -2484,41 +2604,41 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                           onClose={() => setShowMoveInPicker(false)}
                         />
                       </View>
-                      <View style={{ flex: 1 }}>
+                      <View style={styles.twoColField}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                           <Ionicons name="calendar-outline" size={13} color={colors.primary} style={{ marginRight: 4 }} />
-                          <Text style={[styles.inputLabel, { marginBottom: 0 }]} allowFontScaling={false}>INVOICES FROM DATE *</Text>
+                          <Text style={[styles.cleanFieldLabel, { marginBottom: 0 }]} allowFontScaling={false} numberOfLines={1}>INVOICES FROM *</Text>
                         </View>
                         <TouchableOpacity
-                          style={styles.datePickerBtn}
+                          style={styles.cleanDatePickerBtn}
                           onPress={() => setShowInvoiceStartPicker(true)}
                           activeOpacity={0.7}
                         >
-                          <Text style={[styles.datePickerBtnText, !tInvoiceStartDate && { color: colors.placeholder }]} allowFontScaling={false}>
-                            {tInvoiceStartDate || tMoveInDate || '2026-01-21'}
+                          <Text style={[styles.cleanDatePickerText, !tInvoiceStartDate && { color: colors.placeholder }]} numberOfLines={1} allowFontScaling={false}>
+                            {tInvoiceStartDate || 'Select Date'}
                           </Text>
-                          <Ionicons name="calendar" size={16} color={colors.primary} />
+                          <Ionicons name="calendar" size={15} color={colors.primary} />
                         </TouchableOpacity>
-                        <Text style={styles.helperText} allowFontScaling={false}>Date to start generating invoices from</Text>
+                        <Text style={styles.cleanHelperText} allowFontScaling={false} numberOfLines={1}>Invoices start date</Text>
                         <CustomDatePicker
                           visible={showInvoiceStartPicker}
-                          value={tInvoiceStartDate || tMoveInDate || '2026-01-21'}
+                          value={tInvoiceStartDate || tMoveInDate || new Date().toISOString().split('T')[0]}
                           onSelect={(date) => setTInvoiceStartDate(date)}
                           onClose={() => setShowInvoiceStartPicker(false)}
                         />
                       </View>
                     </View>
 
-                    <View style={{ marginTop: 8 }}>
+                    <View style={{ marginTop: 10 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                         <Text style={{ fontSize: 13, color: '#f59e0b', fontWeight: 'bold', marginRight: 4 }}>$</Text>
-                        <Text style={[styles.inputLabel, { marginBottom: 0 }]} allowFontScaling={false}>OUTSTANDING BALANCE ($)</Text>
+                        <Text style={[styles.cleanFieldLabel, { marginBottom: 0 }]} allowFontScaling={false}>OUTSTANDING BALANCE ($)</Text>
                       </View>
-                      <TextInput style={styles.input} keyboardType="numeric" placeholder="0" placeholderTextColor={colors.placeholder} value={tOutstandingBalance} onChangeText={setTOutstandingBalance} allowFontScaling={false} />
-                      <Text style={styles.helperText} allowFontScaling={false}>Initial balance logged in ledger</Text>
+                      <TextInput style={styles.cleanInput} keyboardType="numeric" placeholder="0" placeholderTextColor={colors.placeholder} value={tOutstandingBalance} onChangeText={setTOutstandingBalance} allowFontScaling={false} />
+                      <Text style={styles.cleanHelperText} allowFontScaling={false}>Initial balance logged in ledger</Text>
                     </View>
 
-                    {/* MONTHLY BILLING STATUS (Exact Match Web Screenshot 1:1) */}
+                    {/* MONTHLY BILLING STATUS */}
                     {pastMonths.length > 0 && (
                       <View style={styles.billingStatusBox}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
@@ -2527,42 +2647,47 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                             MONTHLY BILLING STATUS ({pastMonths.length} MONTHS PAST)
                           </Text>
                         </View>
-                        <Text style={styles.helperText} allowFontScaling={false}>
-                          Click a month chip to set status: <Text style={{ color: colors.success, fontWeight: '700' }}>Paid</Text>, <Text style={{ color: colors.warning, fontWeight: '700' }}>Partial</Text>, or <Text style={{ color: colors.danger, fontWeight: '700' }}>Unpaid</Text>. Unpaid months auto-calculate balance.
+                        <Text style={styles.cleanHelperText} allowFontScaling={false}>
+                          Tap any month to set status: <Text style={{ color: colors.success, fontWeight: '700' }}>Paid</Text>, <Text style={{ color: colors.warning, fontWeight: '700' }}>Partial</Text>, or <Text style={{ color: colors.danger, fontWeight: '700' }}>Unpaid</Text>.
                         </Text>
 
-                        {/* Late Fee Checkbox & Badges Row */}
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginVertical: 8 }}>
-                          <TouchableOpacity
-                            style={[
-                              styles.lateFeeToggleRow,
-                              includeMonthlyLateFee && { backgroundColor: 'rgba(245, 158, 11, 0.18)', borderColor: '#f59e0b' }
-                            ]}
-                            onPress={() => setIncludeMonthlyLateFee(!includeMonthlyLateFee)}
-                          >
-                            <Ionicons
-                              name={includeMonthlyLateFee ? "checkbox" : "square-outline"}
-                              size={15}
-                              color={includeMonthlyLateFee ? "#d97706" : colors.textMuted}
-                            />
-                            <Text style={[styles.lateFeeToggleText, includeMonthlyLateFee && { color: "#d97706" }]} allowFontScaling={false}>
-                              Include $50 Late Fee for Unpaid Months
-                            </Text>
-                          </TouchableOpacity>
+                        {/* Late Fee Checkbox Row */}
+                        <TouchableOpacity
+                          style={[
+                            styles.monthlyLateFeeBtn,
+                            includeMonthlyLateFee && styles.monthlyLateFeeBtnActive
+                          ]}
+                          onPress={() => setIncludeMonthlyLateFee(!includeMonthlyLateFee)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={includeMonthlyLateFee ? "checkbox" : "square-outline"}
+                            size={16}
+                            color={includeMonthlyLateFee ? "#d97706" : colors.textMuted}
+                          />
+                          <Text style={[styles.monthlyLateFeeText, includeMonthlyLateFee && { color: "#d97706" }]} allowFontScaling={false}>
+                            Include $50 Late Fee for Unpaid Months
+                          </Text>
+                        </TouchableOpacity>
 
+                        {/* Summary Badges Row */}
+                        <View style={styles.billingStatsRow}>
                           <View style={styles.paidBadge}>
+                            <Ionicons name="checkmark-circle" size={11} color={colors.success} style={{ marginRight: 3 }} />
                             <Text style={styles.paidBadgeText} allowFontScaling={false}>
                               Paid: {paidCount} (${paidTotal.toLocaleString()})
                             </Text>
                           </View>
                           {partialCount > 0 && (
                             <View style={styles.partialBadge}>
+                              <Ionicons name="time" size={11} color={colors.warning} style={{ marginRight: 3 }} />
                               <Text style={styles.partialBadgeText} allowFontScaling={false}>
                                 Partial: {partialCount}
                               </Text>
                             </View>
                           )}
                           <View style={styles.unpaidBadge}>
+                            <Ionicons name="alert-circle" size={11} color={colors.danger} style={{ marginRight: 3 }} />
                             <Text style={styles.unpaidBadgeText} allowFontScaling={false}>
                               Unpaid: {unpaidCount} (${unpaidTotal.toLocaleString()})
                             </Text>
@@ -2583,9 +2708,9 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                               <TouchableOpacity
                                 key={m.id}
                                 style={[
-                                  styles.monthChip,
-                                  isPaid ? styles.monthChipPaid : isPartial ? styles.monthChipPartial : styles.monthChipUnpaid,
-                                  activeMonthPopover?.id === m.id && { borderWidth: 2, borderColor: colors.primary }
+                                  styles.monthChipClean,
+                                  isPaid ? styles.monthChipCleanPaid : isPartial ? styles.monthChipCleanPartial : styles.monthChipCleanUnpaid,
+                                  activeMonthPopover?.id === m.id && { borderWidth: 1.5, borderColor: colors.primary }
                                 ]}
                                 onPress={() => {
                                   if (activeMonthPopover?.id === m.id) {
@@ -2595,21 +2720,27 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                                     setPartialAmountInput(isPartial ? String(d.paidAmount) : String(Math.round(rentVal / 2)));
                                   }
                                 }}
+                                activeOpacity={0.7}
                               >
-                                <Ionicons
-                                  name={isPaid ? "checkmark-circle" : isPartial ? "time" : "close-circle"}
-                                  size={13}
-                                  color={isPaid ? colors.success : isPartial ? colors.warning : colors.danger}
-                                  style={{ marginRight: 4 }}
-                                />
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, marginRight: 4 }}>
+                                  <Ionicons
+                                    name={isPaid ? "checkmark-circle" : isPartial ? "time" : "close-circle"}
+                                    size={12}
+                                    color={isPaid ? colors.success : isPartial ? colors.warning : colors.danger}
+                                  />
+                                  <Text style={styles.monthChipLabel} allowFontScaling={false} numberOfLines={1}>
+                                    {m.label}
+                                  </Text>
+                                </View>
                                 <Text
                                   style={[
-                                    styles.monthChipText,
-                                    isPaid ? { color: colors.success } : isPartial ? { color: colors.warning } : { color: colors.danger },
+                                    styles.monthChipStatusText,
+                                    isPaid ? { color: colors.success } : isPartial ? { color: colors.warning } : { color: colors.danger }
                                   ]}
                                   allowFontScaling={false}
+                                  numberOfLines={1}
                                 >
-                                  {isPaid ? `${m.label} (Paid)` : isPartial ? `${m.label} ($${d.paidAmount} Paid / $${due} Due)` : `${m.label} (Unpaid - $${due})`}
+                                  {isPaid ? 'Paid' : isPartial ? `$${due} Due` : `$${due}`}
                                 </Text>
                               </TouchableOpacity>
                             );
@@ -2654,10 +2785,10 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                             </View>
 
                             <View style={{ marginTop: 8 }}>
-                              <Text style={styles.inputLabel} allowFontScaling={false}>Partial Payment Amount ($):</Text>
+                              <Text style={styles.cleanFieldLabel} allowFontScaling={false}>Partial Payment Amount ($):</Text>
                               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                                 <TextInput
-                                  style={[styles.input, { flex: 1, height: 36 }]}
+                                  style={[styles.cleanInput, { flex: 1, minHeight: 36, height: 36, paddingVertical: 4 }]}
                                   keyboardType="numeric"
                                   placeholder="e.g. 500"
                                   placeholderTextColor={colors.placeholder}
@@ -2666,7 +2797,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                                   allowFontScaling={false}
                                 />
                                 <TouchableOpacity
-                                  style={[styles.popoverActionBtn, { backgroundColor: 'rgba(245, 158, 11, 0.2)', borderColor: colors.warning }]}
+                                  style={[styles.popoverActionBtn, { backgroundColor: 'rgba(245, 158, 11, 0.2)', borderColor: colors.warning, height: 36 }]}
                                   onPress={() => handleSetMonthStatus(activeMonthPopover.id, 'Partial', Number(partialAmountInput) || 0)}
                                 >
                                   <Text style={[styles.popoverActionText, { color: colors.warning }]} allowFontScaling={false}>
@@ -2680,72 +2811,72 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                       </View>
                     )}
 
-                    {/* ADDITIONAL DETAILS (OPTIONAL) (Matches Web Screenshot 1:1) */}
-                    <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: colors.cardBorder, paddingTop: 10 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View style={{ flex: 1, paddingRight: 6 }}>
-                          <Text style={styles.subSectionHeader} allowFontScaling={false}>
-                            ADDITIONAL DETAILS (OPTIONAL)
-                          </Text>
-                          <Text style={styles.helperText} allowFontScaling={false}>
-                            Government IDs, Emergency Contacts, Employment Parameters & Address History
-                          </Text>
-                        </View>
-                        <TouchableOpacity onPress={() => setShowTenantExtra(!showTenantExtra)}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }} allowFontScaling={false}>
-                            {showTenantExtra ? 'Hide Details ⌃' : 'Show Details ⌵'}
-                          </Text>
-                        </TouchableOpacity>
+                    {/* ADDITIONAL DETAILS (OPTIONAL) */}
+                    <View style={styles.extraAccordionHeader}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={styles.subSectionTitle} allowFontScaling={false}>
+                          ADDITIONAL DETAILS (OPTIONAL)
+                        </Text>
+                        <Text style={styles.cleanHelperText} allowFontScaling={false} numberOfLines={1}>
+                          Government IDs, Emergency Contacts & Employer
+                        </Text>
                       </View>
-
-                      {showTenantExtra && (
-                        <View style={{ marginTop: 8 }}>
-                          <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.inputLabel} allowFontScaling={false}>SSN / TAX ID</Text>
-                              <TextInput style={styles.input} placeholder="XXX-XX-XXXX" placeholderTextColor={colors.placeholder} value={tSsn} onChangeText={setTSsn} allowFontScaling={false} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.inputLabel} allowFontScaling={false}>ID NUMBER</Text>
-                              <TextInput style={styles.input} placeholder="DL-123456" placeholderTextColor={colors.placeholder} value={tIdNumber} onChangeText={setTIdNumber} allowFontScaling={false} />
-                            </View>
-                          </View>
-                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.inputLabel} allowFontScaling={false}>EMERGENCY CONTACT</Text>
-                              <TextInput style={styles.input} placeholder="Jane Doe" placeholderTextColor={colors.placeholder} value={tEmergencyName} onChangeText={setTEmergencyName} allowFontScaling={false} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.inputLabel} allowFontScaling={false}>EMERGENCY PHONE</Text>
-                              <TextInput style={styles.input} keyboardType="phone-pad" placeholder="(512) 555-9999" placeholderTextColor={colors.placeholder} value={tEmergencyPhone} onChangeText={setTEmergencyPhone} allowFontScaling={false} />
-                            </View>
-                          </View>
-                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.inputLabel} allowFontScaling={false}>EMPLOYER</Text>
-                              <TextInput style={styles.input} placeholder="Acme Corp" placeholderTextColor={colors.placeholder} value={tEmployer} onChangeText={setTEmployer} allowFontScaling={false} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.inputLabel} allowFontScaling={false}>WORK PHONE</Text>
-                              <TextInput style={styles.input} keyboardType="phone-pad" placeholder="(512) 555-8888" placeholderTextColor={colors.placeholder} value={tEmployerPhone} onChangeText={setTEmergencyPhone} allowFontScaling={false} />
-                            </View>
-                          </View>
-                        </View>
-                      )}
+                      <TouchableOpacity
+                        style={styles.accordionToggleBtn}
+                        onPress={() => setShowTenantExtra(!showTenantExtra)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.accordionToggleText} allowFontScaling={false}>
+                          {showTenantExtra ? 'Hide ⌃' : 'Show ⌵'}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
 
-                    {/* Automated Workflow Execution Banner (Matches Web Screenshot 1:1) */}
-                    <View style={styles.workflowBanner}>
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                        <Ionicons name="shield-checkmark" size={16} color={colors.success} style={{ marginTop: 1 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.workflowBannerTitle} allowFontScaling={false}>
-                            Automated Workflow Execution:
-                          </Text>
-                          <Text style={styles.workflowBannerText} allowFontScaling={false}>
-                            Submitting will automatically create the Active Tenant account with portal password, generate an Active Lease agreement, auto bypass screening, and mark Move In Workflow as COMPLETED.
-                          </Text>
+                    {showTenantExtra && (
+                      <View style={{ marginTop: 8 }}>
+                        <View style={styles.twoColRow}>
+                          <View style={styles.twoColField}>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>SSN / TAX ID</Text>
+                            <TextInput style={styles.cleanInput} placeholder="XXX-XX-XXXX" placeholderTextColor={colors.placeholder} value={tSsn} onChangeText={setTSsn} allowFontScaling={false} />
+                          </View>
+                          <View style={styles.twoColField}>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>ID NUMBER</Text>
+                            <TextInput style={styles.cleanInput} placeholder="DL-123456" placeholderTextColor={colors.placeholder} value={tIdNumber} onChangeText={setTIdNumber} allowFontScaling={false} />
+                          </View>
                         </View>
+                        <View style={styles.twoColRow}>
+                          <View style={styles.twoColField}>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>EMERGENCY CONTACT</Text>
+                            <TextInput style={styles.cleanInput} placeholder="Jane Doe" placeholderTextColor={colors.placeholder} value={tEmergencyName} onChangeText={setTEmergencyName} allowFontScaling={false} />
+                          </View>
+                          <View style={styles.twoColField}>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>EMERGENCY PHONE</Text>
+                            <TextInput style={styles.cleanInput} keyboardType="phone-pad" placeholder="(512) 555-9999" placeholderTextColor={colors.placeholder} value={tEmergencyPhone} onChangeText={setTEmergencyPhone} allowFontScaling={false} />
+                          </View>
+                        </View>
+                        <View style={styles.twoColRow}>
+                          <View style={styles.twoColField}>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>EMPLOYER</Text>
+                            <TextInput style={styles.cleanInput} placeholder="Acme Corp" placeholderTextColor={colors.placeholder} value={tEmployer} onChangeText={setTEmployer} allowFontScaling={false} />
+                          </View>
+                          <View style={styles.twoColField}>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>WORK PHONE</Text>
+                            <TextInput style={styles.cleanInput} keyboardType="phone-pad" placeholder="(512) 555-8888" placeholderTextColor={colors.placeholder} value={tEmployerPhone} onChangeText={setTEmployerPhone} allowFontScaling={false} />
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Automated Workflow Execution Banner */}
+                    <View style={styles.workflowBannerClean}>
+                      <Ionicons name="shield-checkmark" size={18} color={colors.success} style={{ marginTop: 2, marginRight: 8 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.workflowBannerTitle} allowFontScaling={false}>
+                          Automated Move-In Execution:
+                        </Text>
+                        <Text style={styles.workflowBannerText} allowFontScaling={false}>
+                          Submitting auto-generates resident account, active lease, bypasses screening, and marks Move-In as completed.
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -2753,38 +2884,50 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
 
                 {/* VACANT ADVERTISING PREFERENCE */}
                 {uStatus === 'Vacant' && !editingUnitId && (
-                  <View style={[styles.sectionBox, { marginTop: 12 }]}>
-                    <Text style={styles.sectionBoxTitle} allowFontScaling={false}>VACANT ADVERTISING</Text>
-                    <Text style={styles.cardAddress} allowFontScaling={false}>
+                  <View style={[styles.sectionCard, { marginTop: 12 }]}>
+                    <Text style={styles.sectionCardTitle} allowFontScaling={false}>VACANT ADVERTISING</Text>
+                    <Text style={styles.sectionCardSubtitle} allowFontScaling={false}>
                       Do you want to advertise this vacant unit on rental portals?
                     </Text>
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                       <TouchableOpacity
-                        style={[styles.chip, uWantToAdvertise === 'yes' && styles.chipActive]}
+                        style={[styles.unitPropChip, uWantToAdvertise === 'yes' && styles.unitPropChipActive, { flex: 1, justifyContent: 'center' }]}
                         onPress={() => setUWantToAdvertise('yes')}
                       >
-                        <Text style={[styles.chipText, uWantToAdvertise === 'yes' && styles.chipTextActive]} allowFontScaling={false}>Yes, Advertise</Text>
+                        <Text style={[styles.unitPropChipText, uWantToAdvertise === 'yes' && styles.unitPropChipTextActive]} allowFontScaling={false}>Yes, Advertise</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={[styles.chip, uWantToAdvertise === 'no' && styles.chipActive]}
+                        style={[styles.unitPropChip, uWantToAdvertise === 'no' && styles.unitPropChipActive, { flex: 1, justifyContent: 'center' }]}
                         onPress={() => setUWantToAdvertise('no')}
                       >
-                        <Text style={[styles.chipText, uWantToAdvertise === 'no' && styles.chipTextActive]} allowFontScaling={false}>No</Text>
+                        <Text style={[styles.unitPropChipText, uWantToAdvertise === 'no' && styles.unitPropChipTextActive]} allowFontScaling={false}>No</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
                 )}
               </ScrollView>
 
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setIsUnitModalOpen(false)}>
-                  <Text style={styles.cancelBtnText} allowFontScaling={false}>Cancel</Text>
+              {/* Fixed Footer Buttons */}
+              <View style={styles.unitModalFooter}>
+                <TouchableOpacity
+                  style={styles.unitCancelBtn}
+                  onPress={() => setIsUnitModalOpen(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.unitCancelBtnText} allowFontScaling={false}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.submitBtn} onPress={handleSaveUnit} disabled={submitting}>
+                <TouchableOpacity
+                  style={styles.unitSubmitBtn}
+                  onPress={handleSaveUnit}
+                  disabled={submitting}
+                  activeOpacity={0.8}
+                >
                   {submitting ? (
-                    <ActivityIndicator size="small" color="#0f172a" />
+                    <ActivityIndicator size="small" color="#ffffff" />
                   ) : (
-                    <Text style={styles.submitBtnText} allowFontScaling={false}>Save</Text>
+                    <Text style={styles.unitSubmitBtnText} allowFontScaling={false}>
+                      {editingUnitId ? 'Update Unit' : 'Save Unit'}
+                    </Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -2972,9 +3115,10 @@ const getStyles = (colors, isDarkMode) =>
     // Card Actions
     cardActions: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       justifyContent: 'flex-end',
       alignItems: 'center',
-      gap: 12,
+      gap: 6,
       marginTop: 8,
       paddingTop: 8,
       borderTopWidth: 1,
@@ -2983,11 +3127,16 @@ const getStyles = (colors, isDarkMode) =>
     btnSmall: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 3,
-      paddingVertical: 4,
+      gap: 4,
+      paddingVertical: 5,
+      paddingHorizontal: 8,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
     },
     btnSmallText: {
-      fontSize: 11.5,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.textSecondary,
     },
@@ -3639,6 +3788,379 @@ const getStyles = (colors, isDarkMode) =>
     },
     propSubmitBtnText: {
       fontSize: 13,
+      fontWeight: '700',
+      color: '#ffffff',
+    },
+
+    // Unit Full Modal & Clean Form Styles
+    unitFullModalCard: {
+      maxHeight: '94%',
+      height: '92%',
+      padding: 16,
+    },
+    modalHeaderClean: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      paddingBottom: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.cardBorder,
+    },
+    unitModalTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    unitModalSubtitle: {
+      fontSize: 11.5,
+      color: colors.textMuted,
+      marginTop: 2,
+    },
+    unitCloseBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: isDarkMode ? '#334155' : '#e2e8f0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cleanFieldLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textMuted,
+      letterSpacing: 0.3,
+      marginBottom: 5,
+    },
+    cleanInput: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 7,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      fontSize: 13,
+      color: colors.textPrimary,
+      minHeight: 40,
+    },
+    inputErrorBorder: {
+      borderColor: colors.danger,
+    },
+    twoColRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 10,
+    },
+    twoColField: {
+      flex: 1,
+    },
+    unitPropChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 7,
+    },
+    unitPropChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(2, 132, 199, 0.1)',
+    },
+    unitPropChipText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    unitPropChipTextActive: {
+      color: colors.primary,
+      fontWeight: '700',
+    },
+    unitStatusChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 7,
+    },
+    unitStatusChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(2, 132, 199, 0.1)',
+    },
+    unitStatusChipOccupied: {
+      borderColor: colors.success,
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    },
+    unitStatusChipText: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: colors.textSecondary,
+    },
+    unitStatusChipTextActive: {
+      color: colors.primary,
+      fontWeight: '700',
+    },
+    sectionCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: 12,
+      marginTop: 12,
+    },
+    sectionCardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    sectionCardTitle: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      letterSpacing: 0.3,
+    },
+    sectionCardSubtitle: {
+      fontSize: 10,
+      color: colors.textMuted,
+      marginTop: 2,
+    },
+    occupiedHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    occupiedSectionTitle: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.primary,
+      letterSpacing: 0.4,
+    },
+    activeResidentBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+      borderWidth: 1,
+      borderRadius: 5,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      flexShrink: 0,
+    },
+    activeResidentBadgeText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: colors.success,
+      letterSpacing: 0.3,
+    },
+    statusDotGreen: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.success,
+      marginRight: 4,
+    },
+    subSectionDivider: {
+      marginTop: 14,
+      marginBottom: 6,
+      paddingBottom: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.cardBorder,
+    },
+    subSectionTitle: {
+      fontSize: 10.5,
+      fontWeight: '800',
+      color: colors.textSecondary,
+      letterSpacing: 0.5,
+    },
+    portalAccessBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.1)',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    portalAccessBadgeText: {
+      fontSize: 9.5,
+      fontWeight: '800',
+      color: colors.primary,
+      letterSpacing: 0.3,
+    },
+    passwordContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 7,
+      paddingHorizontal: 4,
+    },
+    passwordInput: {
+      flex: 1,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      fontSize: 13,
+      color: colors.textPrimary,
+      minHeight: 40,
+    },
+    passwordEyeBtn: {
+      padding: 8,
+    },
+    cleanDatePickerBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 7,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      minHeight: 40,
+    },
+    cleanDatePickerText: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      flex: 1,
+    },
+    cleanHelperText: {
+      fontSize: 10,
+      color: colors.textMuted,
+      marginTop: 3,
+    },
+    monthlyLateFeeBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.background,
+      marginTop: 8,
+      marginBottom: 8,
+    },
+    monthlyLateFeeBtnActive: {
+      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+      borderColor: '#f59e0b',
+    },
+    monthlyLateFeeText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    billingStatsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 6,
+    },
+    monthChipClean: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: '48.5%',
+      paddingVertical: 7,
+      paddingHorizontal: 8,
+      borderRadius: 6,
+      borderWidth: 1,
+    },
+    monthChipCleanPaid: {
+      backgroundColor: 'rgba(16, 185, 129, 0.08)',
+      borderColor: 'rgba(16, 185, 129, 0.25)',
+    },
+    monthChipCleanPartial: {
+      backgroundColor: 'rgba(245, 158, 11, 0.08)',
+      borderColor: 'rgba(245, 158, 11, 0.25)',
+    },
+    monthChipCleanUnpaid: {
+      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+      borderColor: 'rgba(239, 68, 68, 0.25)',
+    },
+    monthChipLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    monthChipStatusText: {
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    extraAccordionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 12,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+    },
+    accordionToggleBtn: {
+      backgroundColor: isDarkMode ? '#334155' : '#e2e8f0',
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      borderRadius: 5,
+      flexShrink: 0,
+    },
+    accordionToggleText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    workflowBannerClean: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: 'rgba(16, 185, 129, 0.08)',
+      borderColor: 'rgba(16, 185, 129, 0.25)',
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 10,
+      marginTop: 12,
+    },
+    unitModalFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      gap: 10,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+      marginTop: 6,
+    },
+    unitCancelBtn: {
+      paddingVertical: 9,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: isDarkMode ? '#334155' : '#f1f5f9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    unitCancelBtnText: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    unitSubmitBtn: {
+      backgroundColor: '#2563eb',
+      paddingVertical: 9,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      minWidth: 110,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    unitSubmitBtnText: {
+      fontSize: 12.5,
       fontWeight: '700',
       color: '#ffffff',
     },
