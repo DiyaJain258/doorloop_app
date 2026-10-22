@@ -18,6 +18,7 @@ import {
   Keyboard,
   Linking,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../api/client';
 import { useAuthStore, useThemeStore } from '../store/useStore';
 import { useThemeColors } from '../theme';
@@ -232,6 +233,98 @@ export const TenantDocumentsScreen = () => {
     }
   };
 
+  // Helper to save file directly to the device's Downloads directory (Android)
+  const saveFileToDeviceStorage = async (sourceLocalUri, fileName, mimeType = 'application/pdf') => {
+    try {
+      if (Platform.OS === 'android' && FileSystem.StorageAccessFramework) {
+        let dirUri = null;
+        try {
+          dirUri = await AsyncStorage.getItem('@app_download_directory_uri');
+        } catch (_) {}
+
+        let isValidDir = false;
+        if (dirUri) {
+          try {
+            const check = await FileSystem.StorageAccessFramework.readDirectoryAsync(dirUri);
+            if (check !== undefined) isValidDir = true;
+          } catch (_) {
+            isValidDir = false;
+            dirUri = null;
+          }
+        }
+
+        // If no directory previously selected, open system folder selector (defaults to Downloads)
+        if (!isValidDir || !dirUri) {
+          try {
+            const initialSafUri = FileSystem.StorageAccessFramework.getUriForDirectoryInRoot('Download');
+            const perm = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(initialSafUri);
+            if (perm && perm.granted && perm.directoryUri) {
+              dirUri = perm.directoryUri;
+              try {
+                await AsyncStorage.setItem('@app_download_directory_uri', dirUri);
+              } catch (_) {}
+              isValidDir = true;
+            }
+          } catch (pickerErr) {
+            console.log('Folder permission request error/cancelled:', pickerErr?.message);
+          }
+        }
+
+        // If directory is granted, save directly into user's phone folder
+        if (isValidDir && dirUri) {
+          const base64Content = await FileSystem.readAsStringAsync(sourceLocalUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          // SAF auto-appends extension based on mimeType, so remove trailing extension from name
+          const cleanName = fileName.replace(/\.[^/.]+$/, '').trim() || 'document';
+          const newSafUri = await FileSystem.StorageAccessFramework.createFileAsync(
+            dirUri,
+            cleanName,
+            mimeType
+          );
+
+          await FileSystem.writeAsStringAsync(newSafUri, base64Content, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          Alert.alert(
+            'Download Complete',
+            `"${fileName}" has been downloaded and saved directly to your phone's folder.`,
+            [{ text: 'OK' }]
+          );
+          return true;
+        }
+      }
+
+      // Fallback for iOS or if user cancelled folder selection on Android
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(sourceLocalUri, {
+          mimeType,
+          dialogTitle: `Save ${fileName}`,
+          UTI: mimeType === 'application/pdf' ? 'com.adobe.pdf' : undefined,
+        });
+        return true;
+      } else {
+        Alert.alert('Download Complete', `File "${fileName}" saved.`);
+        return true;
+      }
+    } catch (saveError) {
+      console.log('Error saving file to device storage:', saveError);
+      // Fallback to Sharing if SAF encounters an error
+      if (await Sharing.isAvailableAsync()) {
+        try {
+          await Sharing.shareAsync(sourceLocalUri, {
+            mimeType,
+            dialogTitle: `Save ${fileName}`,
+          });
+          return true;
+        } catch (_) {}
+      }
+      throw saveError;
+    }
+  };
+
   const handleDownload = async (item) => {
     if (!item) return;
     const docObj = typeof item === 'object' && item !== null ? item : { name: String(item) };
@@ -251,20 +344,14 @@ export const TenantDocumentsScreen = () => {
       const isXlsx = lowerName.endsWith('.xlsx');
 
       let mimeType = 'application/octet-stream';
-      let uti = undefined;
-
       if (isPdf) {
         mimeType = 'application/pdf';
-        uti = 'com.adobe.pdf';
       } else if (isJpeg) {
         mimeType = 'image/jpeg';
-        uti = 'public.jpeg';
       } else if (isPng) {
         mimeType = 'image/png';
-        uti = 'public.png';
       } else if (isCsv) {
         mimeType = 'text/csv';
-        uti = 'public.comma-separated-values-text';
       } else if (isXlsx) {
         mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       }
@@ -275,16 +362,11 @@ export const TenantDocumentsScreen = () => {
           const localDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
           const localUri = localDir.endsWith('/') ? `${localDir}${fileName}` : `${localDir}/${fileName}`;
 
-          // Download to local storage
+          // Download to local storage first
           const downloadRes = await FileSystem.downloadAsync(fileUrl, localUri);
 
-          // Open native save / share dialog
-          if (downloadRes && downloadRes.status === 200 && (await Sharing.isAvailableAsync())) {
-            await Sharing.shareAsync(downloadRes.uri, {
-              mimeType,
-              dialogTitle: `Save ${fileName}`,
-              UTI: uti,
-            });
+          if (downloadRes && downloadRes.status === 200) {
+            await saveFileToDeviceStorage(downloadRes.uri, fileName, mimeType);
             return;
           } else {
             await Linking.openURL(fileUrl);
@@ -308,13 +390,7 @@ export const TenantDocumentsScreen = () => {
           encoding: FileSystem.EncodingType.Base64,
         });
 
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(localUri, {
-            mimeType,
-            dialogTitle: `Save ${fileName}`,
-            UTI: uti,
-          });
-        }
+        await saveFileToDeviceStorage(localUri, fileName, mimeType);
         return;
       }
 
@@ -386,15 +462,8 @@ export const TenantDocumentsScreen = () => {
       `;
 
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: `Save ${fileName}.pdf`,
-          UTI: 'com.adobe.pdf',
-        });
-      } else {
-        Alert.alert('Download Complete', `Document "${docTitle}" saved.`);
-      }
+      const finalPdfName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+      await saveFileToDeviceStorage(uri, finalPdfName, 'application/pdf');
     } catch (error) {
       console.log('Error downloading document:', error);
       if (fileUrl && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'))) {

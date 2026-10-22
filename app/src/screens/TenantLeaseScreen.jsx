@@ -7,13 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../api/client';
 import { useAuthStore, useThemeStore } from '../store/useStore';
 import { useThemeColors } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export const TenantLeaseScreen = () => {
   const { logout, refreshAccessToken } = useAuthStore();
@@ -193,6 +196,61 @@ export const TenantLeaseScreen = () => {
       `;
 
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      const fileName = 'Lease_Agreement_Signed.pdf';
+
+      if (Platform.OS === 'android' && FileSystem.StorageAccessFramework) {
+        let dirUri = null;
+        try {
+          dirUri = await AsyncStorage.getItem('@app_download_directory_uri');
+        } catch (_) {}
+
+        let isValidDir = false;
+        if (dirUri) {
+          try {
+            const check = await FileSystem.StorageAccessFramework.readDirectoryAsync(dirUri);
+            if (check !== undefined) isValidDir = true;
+          } catch (_) {
+            isValidDir = false;
+            dirUri = null;
+          }
+        }
+
+        if (!isValidDir || !dirUri) {
+          try {
+            const initialSafUri = FileSystem.StorageAccessFramework.getUriForDirectoryInRoot('Download');
+            const perm = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(initialSafUri);
+            if (perm && perm.granted && perm.directoryUri) {
+              dirUri = perm.directoryUri;
+              try {
+                await AsyncStorage.setItem('@app_download_directory_uri', dirUri);
+              } catch (_) {}
+              isValidDir = true;
+            }
+          } catch (_) {}
+        }
+
+        if (isValidDir && dirUri) {
+          const base64Content = await FileSystem.readAsStringAsync(uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const cleanName = 'Lease_Agreement_Signed';
+          const newSafUri = await FileSystem.StorageAccessFramework.createFileAsync(
+            dirUri,
+            cleanName,
+            'application/pdf'
+          );
+          await FileSystem.writeAsStringAsync(newSafUri, base64Content, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          Alert.alert(
+            'Download Complete',
+            'Signed Lease Agreement has been downloaded and saved directly to your phone\'s folder.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
           mimeType: 'application/pdf',
