@@ -207,9 +207,9 @@ export const ManagerAccountingScreen = ({ initialTab = 'coa' }) => {
       if (showLoading) setLoading(true);
       const [accountsRes, incomeRes, payRes, expRes] = await Promise.all([
         apiClient.get('/accounting/accounts', logout, refreshAccessToken).catch(() => []),
-        apiClient.get('/income', logout, refreshAccessToken).catch(() => apiClient.get('/portal/income', logout, refreshAccessToken).catch(() => [])),
+        apiClient.get('/portal/income', logout, refreshAccessToken).catch(() => []),
         apiClient.get('/payments', logout, refreshAccessToken).catch(() => apiClient.get('/portal/payments', logout, refreshAccessToken).catch(() => [])),
-        apiClient.get('/expenses', logout, refreshAccessToken).catch(() => apiClient.get('/portal/expenses', logout, refreshAccessToken).catch(() => [])),
+        apiClient.get('/portal/expenses', logout, refreshAccessToken).catch(() => []),
       ]);
 
       const rawAccounts = Array.isArray(accountsRes) ? accountsRes : (accountsRes?.data || []);
