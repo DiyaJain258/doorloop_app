@@ -18,9 +18,9 @@ import apiClient from '../api/client';
 import { useAuthStore, useThemeStore } from '../store/useStore';
 import { useThemeColors } from '../theme';
 
-export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) => {
+export const CompanySettingsScreen = ({ initialTab = 'menu', onNavigate }) => {
   const resolveTab = (t) => {
-    if (!t || t === 'company-settings' || t === 'admin') return 'profile';
+    if (!t || t === 'company-settings' || t === 'admin' || t === 'menu') return 'menu';
     return t;
   };
   const { user, logout, refreshAccessToken } = useAuthStore();
@@ -28,9 +28,13 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
   const { colors, isDarkMode } = useThemeColors();
   const styles = getStyles(colors, isDarkMode);
 
-  // Active sub-tab state (9 submenus)
+  // Active sub-tab state (9 submenus or 'menu' for the 3-column app grid)
   const [activeTab, setActiveTab] = useState(resolveTab(initialTab));
-  const [submenuModalOpen, setSubmenuModalOpen] = useState(false);
+
+  useEffect(() => {
+    setActiveTab(resolveTab(initialTab));
+  }, [initialTab]);
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -1060,15 +1064,15 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
   };
 
   const submenus = [
-    { id: 'profile', title: 'Company Profile', icon: 'business-outline', desc: 'Branding, timezone, currency & default profile' },
-    { id: 'unit-deletion', title: 'Asset & Portfolio Deletion', icon: 'trash-outline', desc: 'Security deletion safeguards for units & properties' },
-    { id: 'late-fees', title: 'Late Fee Policy', icon: 'time-outline', desc: 'Grace periods, automated late fee schedules & rules' },
-    { id: 'users', title: 'Users & Roles', icon: 'people-outline', desc: 'Company staff, employee logins & user management' },
-    { id: 'roles', title: 'Roles & Permissions', icon: 'shield-outline', desc: 'Operational permissions matrix & role privileges' },
-    { id: 'payment-settings', title: 'Payment Settings', icon: 'card-outline', desc: 'Merchant gateways, stripe credentials & fee settings' },
-    { id: 'billing', title: 'Subscription & Billing', icon: 'receipt-outline', desc: 'SaaS plan tiers, recurring billing & invoices' },
-    { id: 'integrations', title: 'Integrations Marketplace', icon: 'apps-outline', desc: 'Twilio SMS, WhatsApp Cloud API & webhooks' },
-    { id: 'connected', title: 'Connected Apps (QuickBooks)', icon: 'git-network-outline', desc: 'Sync customer accounts & external connectors' },
+    { id: 'profile', title: 'Company Profile', shortTitle: 'Company Profile', icon: 'business-outline', color: '#38bdf8', desc: 'Branding, timezone, currency & default profile' },
+    { id: 'unit-deletion', title: 'Asset & Portfolio Deletion', shortTitle: 'Asset Deletion', icon: 'trash-outline', color: '#ef4444', desc: 'Security deletion safeguards for units & properties' },
+    { id: 'late-fees', title: 'Late Fee Policy', shortTitle: 'Late Fee Policy', icon: 'time-outline', color: '#f59e0b', desc: 'Grace periods, automated late fee schedules & rules' },
+    { id: 'users', title: 'Users & Roles', shortTitle: 'Users & Roles', icon: 'people-outline', color: '#3b82f6', desc: 'Company staff, employee logins & user management' },
+    { id: 'roles', title: 'Roles & Permissions', shortTitle: 'Roles & Perms', icon: 'shield-outline', color: '#8b5cf6', desc: 'Operational permissions matrix & role privileges' },
+    { id: 'payment-settings', title: 'Payment Settings', shortTitle: 'Payment Settings', icon: 'card-outline', color: '#10b981', desc: 'Merchant gateways, stripe credentials & fee settings' },
+    { id: 'billing', title: 'Subscription & Billing', shortTitle: 'Billing & Plan', icon: 'receipt-outline', color: '#ec4899', desc: 'SaaS plan tiers, recurring billing & invoices' },
+    { id: 'integrations', title: 'Integrations Marketplace', shortTitle: 'Integrations', icon: 'apps-outline', color: '#06b6d4', desc: 'Twilio SMS, WhatsApp Cloud API & webhooks' },
+    { id: 'connected', title: 'Connected Apps (QuickBooks)', shortTitle: 'Connected Apps', icon: 'git-network-outline', color: '#6366f1', desc: 'Sync customer accounts & external connectors' },
   ];
 
   const currentSubmenu = submenus.find((s) => s.id === activeTab) || submenus[0];
@@ -1187,6 +1191,7 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
 
   // Dynamic Page Title & Subtitle based on activeTab
   const getPageTitle = () => {
+    if (activeTab === 'menu') return 'Company Settings';
     if (activeTab === 'unit-deletion') return 'Asset & Portfolio Security Deletion';
     if (activeTab === 'late-fees') return 'Late Fee Configuration';
     if (activeTab === 'users') return 'Organization User Hub';
@@ -1199,6 +1204,7 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
   };
 
   const getPageSubtitle = () => {
+    if (activeTab === 'menu') return 'All 9 Administrative Sub-Menus';
     if (activeTab === 'unit-deletion') {
       return 'Centralized authorization portal for password-restricted removal of Properties, Buildings, and Units across your portfolio.';
     }
@@ -1232,86 +1238,42 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
 
   return (
     <View style={styles.container}>
-      {/* SCREEN HEADER matching Web PageHeader */}
+      {/* SCREEN HEADER */}
       <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 48 : 16 }]}>
-        {activeTab === 'profile' ? (
-          <View style={styles.headerTitleRow}>
+        {activeTab === 'menu' ? (
+          <View style={styles.headerTitleRowWithBack}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => onNavigate && onNavigate('more')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+            </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle} allowFontScaling={false}>Company Profile & Settings</Text>
+              <Text style={styles.headerTitle} allowFontScaling={false}>Company Settings</Text>
               <Text style={styles.headerSubtitle} allowFontScaling={false}>
-                Configure default branding profile, regional timezones, base currency, and automated late fee grace period rules.
+                All 9 Administrative Sub-Menus
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.moreSectionsBtn}
-              onPress={() => setSubmenuModalOpen(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="apps" size={13} color="#2563eb" style={{ marginRight: 4 }} />
-              <Text style={styles.moreSectionsBtnText} allowFontScaling={false}>Sections</Text>
-              <Ionicons name="chevron-down" size={13} color="#2563eb" style={{ marginLeft: 2 }} />
-            </TouchableOpacity>
           </View>
         ) : (
-          <>
-            <View style={styles.headerTitleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.headerTitle} allowFontScaling={false}>{getPageTitle()}</Text>
-                <Text style={styles.headerSubtitle} allowFontScaling={false}>{getPageSubtitle()}</Text>
-              </View>
-            </View>
-
-            {/* INTERACTIVE SUB-MENU SELECTOR CARD */}
+          <View style={styles.headerTitleRowWithBack}>
             <TouchableOpacity
-              style={styles.submenuSelectorCard}
-              onPress={() => setSubmenuModalOpen(true)}
-              activeOpacity={0.8}
+              style={styles.backButton}
+              onPress={() => setActiveTab('menu')}
+              activeOpacity={0.7}
             >
-              <View style={styles.submenuIconBadge}>
-                <Ionicons name={currentSubmenu.icon} size={20} color="#2563eb" />
-              </View>
-              <View style={{ flex: 1, paddingRight: 6 }}>
-                <Text style={styles.submenuSelectorActiveTitle} allowFontScaling={false}>
-                  {currentSubmenu.title}
-                </Text>
-                <Text style={styles.submenuSelectorHint} allowFontScaling={false}>
-                  Tap to view all 9 sub-menus ▼
-                </Text>
-              </View>
-              <View style={styles.allSubmenusBadge}>
-                <Ionicons name="apps" size={13} color="#2563eb" style={{ marginRight: 4 }} />
-                <Text style={styles.allSubmenusBadgeText} allowFontScaling={false}>9 Sub-Menus</Text>
-                <Ionicons name="chevron-down" size={14} color="#2563eb" style={{ marginLeft: 2 }} />
-              </View>
+              <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
             </TouchableOpacity>
-
-            {/* Clean, smooth horizontal quick-chips */}
-            <View style={styles.subtabsWrapper}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subtabsContent}>
-                {submenus.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <TouchableOpacity
-                      key={tab.id}
-                      style={[styles.subtabPill, isActive && styles.subtabPillActive]}
-                      onPress={() => setActiveTab(tab.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name={tab.icon}
-                        size={13}
-                        color={isActive ? '#ffffff' : colors.textSecondary}
-                        style={{ marginRight: 5 }}
-                      />
-                      <Text style={[styles.subtabText, isActive && styles.subtabTextActive]} allowFontScaling={false}>
-                        {tab.title}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail" allowFontScaling={false}>
+                {getPageTitle()}
+              </Text>
+              <Text style={styles.headerSubtitle} numberOfLines={1} ellipsizeMode="tail" allowFontScaling={false}>
+                {getPageSubtitle()}
+              </Text>
             </View>
-          </>
+          </View>
         )}
       </View>
 
@@ -1326,6 +1288,39 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
           <View style={styles.notificationBanner}>
             <Ionicons name="checkmark-circle" size={18} color="#10b981" style={{ marginRight: 8 }} />
             <Text style={styles.notificationText} allowFontScaling={false}>{notification}</Text>
+          </View>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 0: 3-COLUMN SETTINGS GRID MENU (ROW ME 3 MENU TILES) */}
+        {/* ========================================================= */}
+        {activeTab === 'menu' && (
+          <View style={styles.menuGridWrapper}>
+            <Text style={styles.menuGridSectionHeader} allowFontScaling={false}>
+              ADMINISTRATIVE SETTINGS
+            </Text>
+            <View style={styles.gridContainer}>
+              {submenus.map((tab) => (
+                <TouchableOpacity
+                  key={tab.id}
+                  style={styles.gridItem}
+                  onPress={() => setActiveTab(tab.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.iconBox, { backgroundColor: `${tab.color || '#3b82f6'}18` }]}>
+                    <Ionicons name={tab.icon} size={28} color={tab.color || '#3b82f6'} />
+                  </View>
+                  <Text
+                    style={styles.gridLabel}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                    allowFontScaling={false}
+                  >
+                    {tab.shortTitle || tab.title}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
 
@@ -3725,73 +3720,6 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
           </View>
         </View>
       </Modal>
-    
-      {/* 9 SUB-MENUS DROPDOWN MODAL (Matches Web Sidebar Screenshot Exactly) */}
-      <Modal
-        visible={submenuModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSubmenuModalOpen(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setSubmenuModalOpen(false)}
-        >
-          <View style={[styles.modalContent, { maxHeight: '82%', width: '92%', alignSelf: 'center', borderRadius: 20 }]}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={[styles.submenuIconBadge, { width: 34, height: 34 }]}>
-                  <Ionicons name="settings-outline" size={18} color="#2563eb" />
-                </View>
-                <View style={{ marginLeft: 10 }}>
-                  <Text style={styles.modalTitle} allowFontScaling={false}>Company Settings</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b' }} allowFontScaling={false}>
-                    All 9 Administrative Sub-Menus
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setSubmenuModalOpen(false)} style={{ padding: 4 }}>
-                <Ionicons name="close" size={22} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 8 }}>
-              {submenus.map((tab) => {
-                const isSelected = activeTab === tab.id;
-                return (
-                  <TouchableOpacity
-                    key={tab.id}
-                    style={[styles.modalSubmenuItem, isSelected && styles.modalSubmenuItemSelected]}
-                    onPress={() => {
-                      setActiveTab(tab.id);
-                      setSubmenuModalOpen(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.modalSubmenuIconBox, isSelected && styles.modalSubmenuIconBoxSelected]}>
-                      <Ionicons name={tab.icon} size={18} color={isSelected ? '#2563eb' : (isDarkMode ? '#94a3b8' : '#64748b')} />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={[styles.modalSubmenuTitle, isSelected && styles.modalSubmenuTitleSelected]} allowFontScaling={false}>
-                        {tab.title}
-                      </Text>
-                      <Text style={styles.modalSubmenuDesc} numberOfLines={1} allowFontScaling={false}>
-                        {tab.desc}
-                      </Text>
-                    </View>
-                    {isSelected ? (
-                      <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={16} color={isDarkMode ? '#475569' : '#cbd5e1'} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </View>
   );
 };
@@ -3799,26 +3727,98 @@ export const CompanySettingsScreen = ({ initialTab = 'profile', onNavigate }) =>
 const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
 
-  // Screen Header
+  // Screen Header & Back Navigation
   header: {
     backgroundColor: colors.background,
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.cardBorder,
   },
-  headerTitleRow: {
-    marginBottom: 8,
+  headerTitleRowWithBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  quickGridButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : '#bfdbfe',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
     color: colors.textPrimary,
   },
   headerSubtitle: {
     fontSize: 11.5,
     color: colors.textSecondary,
-    marginTop: 4,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+
+  // 3-Column Settings App Grid Menu (Larger & Spacious to fill the page)
+  menuGridWrapper: {
+    paddingVertical: 8,
+  },
+  menuGridSectionHeader: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.textMuted,
+    marginBottom: 16,
+    letterSpacing: 0.8,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: 24,
+  },
+  gridItem: {
+    width: '31%',
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 6,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 122,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDarkMode ? 0.25 : 0.05,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  iconBox: {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  gridLabel: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center',
     lineHeight: 16,
   },
 

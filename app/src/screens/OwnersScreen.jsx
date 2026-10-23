@@ -498,27 +498,27 @@ export const OwnersScreen = () => {
       </Modal>
 
       {/* ADD / EDIT OWNER MODAL */}
-      <Modal visible={isFormModalOpen} animationType="slide" transparent>
+      <Modal visible={isFormModalOpen} animationType="fade" transparent>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalBackdrop}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.formModalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle} allowFontScaling={false}>
-                  {editingOwner ? 'Edit Property Owner' : 'Add Property Owner'}
-                </Text>
-                <TouchableOpacity onPress={() => setIsFormModalOpen(false)} style={styles.modalCloseBtn}>
-                  <Ionicons name="close" size={22} color="#94a3b8" />
-                </TouchableOpacity>
-              </View>
+          <View style={styles.formModalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle} allowFontScaling={false}>
+                {editingOwner ? 'Edit Property Owner' : 'Add Property Owner'}
+              </Text>
+              <TouchableOpacity onPress={() => setIsFormModalOpen(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={22} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
 
-              <ScrollView
-                style={{ maxHeight: 460 }}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
+            <ScrollView
+              style={{ flexShrink: 1 }}
+              contentContainerStyle={{ paddingBottom: 10 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
                 {/* Full Name */}
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel} allowFontScaling={false}>FULL NAME *</Text>
@@ -623,26 +623,28 @@ export const OwnersScreen = () => {
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel} allowFontScaling={false}>ASSIGN PROPERTIES</Text>
                   <View style={styles.propsCheckContainer}>
-                    {properties.length === 0 ? (
-                      <Text style={styles.noPropsText} allowFontScaling={false}>No properties created yet.</Text>
-                    ) : (
-                      properties.map((p) => {
-                        const isChecked = selectedPropertyIds.includes(p.id);
-                        return (
-                          <TouchableOpacity
-                            key={p.id}
-                            style={styles.propCheckRow}
-                            onPress={() => togglePropertySelection(p.id)}
-                            activeOpacity={0.7}
-                          >
-                            <View style={[styles.checkBox, isChecked && styles.checkBoxActive]}>
-                              {isChecked && <Ionicons name="checkmark" size={12} color="#ffffff" />}
-                            </View>
-                            <Text style={styles.propCheckName} allowFontScaling={false}>{p.name}</Text>
-                          </TouchableOpacity>
-                        );
-                      })
-                    )}
+                    <ScrollView style={{ maxHeight: 120 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                      {properties.length === 0 ? (
+                        <Text style={styles.noPropsText} allowFontScaling={false}>No properties created yet.</Text>
+                      ) : (
+                        properties.map((p) => {
+                          const isChecked = selectedPropertyIds.includes(p.id);
+                          return (
+                            <TouchableOpacity
+                              key={p.id}
+                              style={styles.propCheckRow}
+                              onPress={() => togglePropertySelection(p.id)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={[styles.checkBox, isChecked && styles.checkBoxActive]}>
+                                {isChecked && <Ionicons name="checkmark" size={12} color="#ffffff" />}
+                              </View>
+                              <Text style={styles.propCheckName} allowFontScaling={false}>{p.name}</Text>
+                            </TouchableOpacity>
+                          );
+                        })
+                      )}
+                    </ScrollView>
                   </View>
                 </View>
               </ScrollView>
@@ -671,7 +673,6 @@ export const OwnersScreen = () => {
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -860,28 +861,33 @@ const getStyles = (colors, isDarkMode) =>
     // Modal Styling
     modalBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      backgroundColor: 'rgba(0, 0, 0, 0.72)',
       justifyContent: 'center',
       alignItems: 'center',
-      padding: 16,
+      paddingHorizontal: 16,
+      paddingVertical: Platform.OS === 'ios' ? 44 : 20,
     },
     viewModalCard: {
       width: '100%',
       maxWidth: 440,
+      maxHeight: '88%',
       backgroundColor: colors.surface,
       borderRadius: 20,
-      padding: 20,
+      padding: 18,
       borderWidth: 1,
       borderColor: colors.cardBorder,
+      overflow: 'hidden',
     },
     formModalCard: {
       width: '100%',
       maxWidth: 440,
+      maxHeight: '88%',
       backgroundColor: colors.surface,
       borderRadius: 20,
-      padding: 20,
+      padding: 18,
       borderWidth: 1,
       borderColor: colors.cardBorder,
+      overflow: 'hidden',
     },
     modalHeader: {
       flexDirection: 'row',

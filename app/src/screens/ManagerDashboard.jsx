@@ -78,6 +78,7 @@ export const ManagerDashboard = ({ onNavigate }) => {
   // 5. Interactive Metric Detail Modal State
   const [selectedMetric, setSelectedMetric] = useState(null);
   const [modalSearch, setModalSearch] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Fetch live dashboard data matching Web Frontend APIs strictly from real DB
   const fetchDashboardData = async () => {
@@ -92,6 +93,7 @@ export const ManagerDashboard = ({ onNavigate }) => {
         unitsRes,
         expensesRes,
         tenantsRes,
+        notifsRes,
       ] = await Promise.all([
         apiClient.get('/dashboard/metrics', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/dashboard/charts', logout, refreshAccessToken).catch(() => null),
@@ -102,7 +104,14 @@ export const ManagerDashboard = ({ onNavigate }) => {
         apiClient.get('/units', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/portal/expenses', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/tenants', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/notifications?role=Property Manager', logout, refreshAccessToken).catch(() => null),
       ]);
+
+      // Unread notifications count for Dashboard Bell
+      const rawNotifs = Array.isArray(notifsRes) ? notifsRes : (notifsRes?.data || []);
+      const notifArray = Array.isArray(rawNotifs) ? rawNotifs : [];
+      const unread = notifArray.filter((n) => !n.read && !n.isRead).length;
+      setUnreadCount(unread);
 
       // 1. Process Live Properties & Units from DB
       const rawProps = Array.isArray(propsRes) ? propsRes : (propsRes?.data || []);
@@ -512,10 +521,10 @@ export const ManagerDashboard = ({ onNavigate }) => {
       }
     >
       {/* =========================================================================
-          1. CLEAN TOP HEADER WITH WELCOME & LIVE SYNC
+          1. CLEAN TOP HEADER WITH WELCOME & NOTIFICATIONS
           ========================================================================= */}
       <View style={styles.headerRow}>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, paddingRight: 8 }}>
           <Text style={[styles.headerGreeting, { color: colors.textSecondary }]} allowFontScaling={false}>
             {user?.firstName ? `Welcome back, ${user.firstName}` : 'Portfolio Operations'} 👋
           </Text>
@@ -524,21 +533,45 @@ export const ManagerDashboard = ({ onNavigate }) => {
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.syncBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
-          onPress={handleRefresh}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name="refresh-outline"
-            size={16}
-            color="#2563eb"
-            style={{ marginRight: 4 }}
-          />
-          <Text style={styles.syncBtnText} allowFontScaling={false}>
-            Sync
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.syncBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+            onPress={handleRefresh}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="refresh-outline"
+              size={15}
+              color="#2563eb"
+              style={{ marginRight: 4 }}
+            />
+            <Text style={styles.syncBtnText} allowFontScaling={false}>
+              Sync
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.bellBtn,
+              {
+                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                borderColor: colors.cardBorder,
+              },
+            ]}
+            onPress={() => onNavigate && onNavigate('notifications')}
+            activeOpacity={0.7}
+            accessibilityLabel="Notifications"
+          >
+            <Ionicons name="notifications-outline" size={20} color={colors.textPrimary} />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* =========================================================================
@@ -1211,6 +1244,34 @@ const getStyles = (colors, isDarkMode) =>
       fontSize: 12,
       fontWeight: '700',
       color: '#2563eb',
+    },
+    bellBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+      borderWidth: 1,
+    },
+    bellBadge: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+      backgroundColor: '#ef4444',
+      borderRadius: 9,
+      minWidth: 16,
+      height: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+      borderWidth: 1.5,
+      borderColor: colors.background,
+    },
+    bellBadgeText: {
+      color: '#ffffff',
+      fontSize: 8.5,
+      fontWeight: '900',
     },
 
     // Shortcuts Horizontal Scroll

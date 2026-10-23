@@ -47,6 +47,16 @@ const GATEWAY_STATUSES = [
   { label: 'Inactive (Temporarily Disabled)', value: 'Inactive' },
 ];
 const UNIT_STATUSES = ['Occupied', 'Vacant', 'Reserved', 'Under Maintenance'];
+const ID_TYPES = ['Driver License', 'Passport', 'State ID'];
+const EMPLOYMENT_STATUSES = [
+  'Full-Time',
+  'Part-Time',
+  'Self-Employed',
+  'Unemployed',
+  'Student',
+  'Retired',
+];
+const OWNER_PAYOUT_METHODS = ['ACH/Direct Deposit', 'Wire Transfer', 'Check'];
 const GENDERS = ['Male', 'Female', 'Other'];
 
 export const normalizeGender = (g) => {
@@ -214,11 +224,15 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   // Dropdown Picker Modal state for Property Form
   const [activePropDropdown, setActivePropDropdown] = useState(null); // 'type' | 'status' | 'owner' | 'paymentAccountSetup' | 'customGateway' | 'gatewayStatus' | null
 
-  // Quick Add Owner Modal inside Property Form
+  // Quick Add Owner Modal inside Property Form (Matching Web 1:1)
   const [isQuickAddOwnerOpen, setIsQuickAddOwnerOpen] = useState(false);
   const [newOwnerFullName, setNewOwnerFullName] = useState('');
   const [newOwnerEmail, setNewOwnerEmail] = useState('');
+  const [newOwnerPassword, setNewOwnerPassword] = useState('');
+  const [showNewOwnerPassword, setShowNewOwnerPassword] = useState(false);
   const [newOwnerPhone, setNewOwnerPhone] = useState('');
+  const [newOwnerPayoutMethod, setNewOwnerPayoutMethod] = useState('ACH/Direct Deposit');
+  const [showOwnerPayoutDropdown, setShowOwnerPayoutDropdown] = useState(false);
   const [creatingOwner, setCreatingOwner] = useState(false);
 
   // Unit Form Inputs
@@ -270,15 +284,22 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const [activeMonthPopover, setActiveMonthPopover] = useState(null); // { id, label }
   const [partialAmountInput, setPartialAmountInput] = useState('');
 
-  // Tenant Additional Optional Accordion
+  // Tenant Additional Optional Accordion (Matching Web 1:1)
   const [showTenantExtra, setShowTenantExtra] = useState(false);
   const [tSsn, setTSsn] = useState('');
   const [tIdType, setTIdType] = useState('Driver License');
   const [tIdNumber, setTIdNumber] = useState('');
   const [tEmergencyName, setTEmergencyName] = useState('');
+  const [tEmergencyRelationship, setTEmergencyRelationship] = useState('');
   const [tEmergencyPhone, setTEmergencyPhone] = useState('');
   const [tEmployer, setTEmployer] = useState('');
+  const [tPosition, setTPosition] = useState('');
   const [tEmployerPhone, setTEmployerPhone] = useState('');
+  const [tMonthlyIncome, setTMonthlyIncome] = useState('');
+  const [tEmploymentStatus, setTEmploymentStatus] = useState('Full-Time');
+  const [tCurrentAddress, setTCurrentAddress] = useState('');
+  const [tPreviousAddress, setTPreviousAddress] = useState('');
+  const [activeUnitDropdown, setActiveUnitDropdown] = useState(null); // 'idType' | 'employmentStatus' | null
 
   useEffect(() => {
     if (initialTab) {
@@ -503,14 +524,18 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
     setIsPropModalOpen(true);
   };
 
-  // Quick Add Owner Action
+  // Add Property Owner Action (Matching Web 1:1)
   const handleQuickAddOwner = async () => {
     if (!newOwnerFullName.trim()) {
       Alert.alert('Validation Error', 'Full Name is required.');
       return;
     }
-    if (!newOwnerEmail.trim()) {
-      Alert.alert('Validation Error', 'Email is required.');
+    if (!newOwnerEmail.trim() || !newOwnerEmail.includes('@')) {
+      Alert.alert('Validation Error', 'Invalid email address.');
+      return;
+    }
+    if (!newOwnerPhone.trim()) {
+      Alert.alert('Validation Error', 'Phone is required.');
       return;
     }
     try {
@@ -521,8 +546,9 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
         firstName: first,
         lastName: rest.join(' ') || 'Owner',
         email: newOwnerEmail.trim(),
-        phone: newOwnerPhone.trim() || undefined,
-        payoutMethod: 'ACH/Direct Deposit',
+        phone: newOwnerPhone.trim(),
+        payoutMethod: newOwnerPayoutMethod || 'ACH/Direct Deposit',
+        password: newOwnerPassword.trim() || 'Password123!',
         role: 'Owner',
       };
       const res = await apiClient.post('/owners', payload, logout, refreshAccessToken);
@@ -540,6 +566,10 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       setNewOwnerFullName('');
       setNewOwnerEmail('');
       setNewOwnerPhone('');
+      setNewOwnerPassword('');
+      setShowNewOwnerPassword(false);
+      setNewOwnerPayoutMethod('ACH/Direct Deposit');
+      setShowOwnerPayoutDropdown(false);
       Alert.alert('Success', 'Owner added and selected successfully!');
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to add owner.');
@@ -691,9 +721,15 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
     setTIdType('Driver License');
     setTIdNumber('');
     setTEmergencyName('');
+    setTEmergencyRelationship('');
     setTEmergencyPhone('');
     setTEmployer('');
+    setTPosition('');
     setTEmployerPhone('');
+    setTMonthlyIncome('');
+    setTEmploymentStatus('Full-Time');
+    setTCurrentAddress('');
+    setTPreviousAddress('');
 
     setFormErrors({});
     setIsUnitModalOpen(true);
@@ -755,9 +791,15 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       setTIdType(existingT.idType || 'Driver License');
       setTIdNumber(existingT.idNumber || '');
       setTEmergencyName(existingT.emergencyName || '');
+      setTEmergencyRelationship(existingT.emergencyRelationship || '');
       setTEmergencyPhone(existingT.emergencyPhone || '');
       setTEmployer(existingT.employer || '');
-      setTEmployerPhone(existingT.employerPhone || '');
+      setTPosition(existingT.position || '');
+      setTEmployerPhone(existingT.employerPhone || existingT.jobPhone || '');
+      setTMonthlyIncome(existingT.monthlyIncome ? String(existingT.monthlyIncome) : '');
+      setTEmploymentStatus(existingT.employmentStatus || 'Full-Time');
+      setTCurrentAddress(existingT.currentAddress || '');
+      setTPreviousAddress(existingT.previousAddress || '');
     } else {
       setTFirstName('');
       setTLastName('');
@@ -775,9 +817,15 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       setTIdType('Driver License');
       setTIdNumber('');
       setTEmergencyName('');
+      setTEmergencyRelationship('');
       setTEmergencyPhone('');
       setTEmployer('');
+      setTPosition('');
       setTEmployerPhone('');
+      setTMonthlyIncome('');
+      setTEmploymentStatus('Full-Time');
+      setTCurrentAddress('');
+      setTPreviousAddress('');
     }
 
     setIncludeMonthlyLateFee(false);
@@ -860,13 +908,20 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               invoiceStartDate: tInvoiceStartDate || tMoveInDate,
               previousBalance: Number(tOutstandingBalance) || 0,
               openingBalance: Number(tOutstandingBalance) || 0,
-              ssn: tSsn || undefined,
+              ssn: tSsn.trim() || undefined,
               idType: tIdType || 'Driver License',
-              idNumber: tIdNumber || undefined,
-              emergencyName: tEmergencyName || undefined,
-              emergencyPhone: tEmergencyPhone || undefined,
-              employer: tEmployer || undefined,
-              employerPhone: tEmployerPhone || undefined,
+              idNumber: tIdNumber.trim() || undefined,
+              emergencyName: tEmergencyName.trim() || undefined,
+              emergencyRelationship: tEmergencyRelationship.trim() || undefined,
+              emergencyPhone: tEmergencyPhone.trim() || undefined,
+              employer: tEmployer.trim() || undefined,
+              employerPhone: tEmployerPhone.trim() || undefined,
+              jobPhone: tEmployerPhone.trim() || undefined,
+              position: tPosition.trim() || undefined,
+              monthlyIncome: tMonthlyIncome.trim() ? Number(tMonthlyIncome) : undefined,
+              employmentStatus: tEmploymentStatus || 'Full-Time',
+              currentAddress: tCurrentAddress.trim() || undefined,
+              previousAddress: tPreviousAddress.trim() || undefined,
             };
 
             let targetTenantId = editingTenantId;
@@ -926,13 +981,20 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
               invoiceStartDate: tInvoiceStartDate || tMoveInDate,
               previousBalance: Number(tOutstandingBalance) || 0,
               openingBalance: Number(tOutstandingBalance) || 0,
-              ssn: tSsn || undefined,
+              ssn: tSsn.trim() || undefined,
               idType: tIdType || 'Driver License',
-              idNumber: tIdNumber || undefined,
-              emergencyName: tEmergencyName || undefined,
-              emergencyPhone: tEmergencyPhone || undefined,
-              employer: tEmployer || undefined,
-              employerPhone: tEmployerPhone || undefined,
+              idNumber: tIdNumber.trim() || undefined,
+              emergencyName: tEmergencyName.trim() || undefined,
+              emergencyRelationship: tEmergencyRelationship.trim() || undefined,
+              emergencyPhone: tEmergencyPhone.trim() || undefined,
+              employer: tEmployer.trim() || undefined,
+              employerPhone: tEmployerPhone.trim() || undefined,
+              jobPhone: tEmployerPhone.trim() || undefined,
+              position: tPosition.trim() || undefined,
+              monthlyIncome: tMonthlyIncome.trim() ? Number(tMonthlyIncome) : undefined,
+              employmentStatus: tEmploymentStatus || 'Full-Time',
+              currentAddress: tCurrentAddress.trim() || undefined,
+              previousAddress: tPreviousAddress.trim() || undefined,
             };
 
             const createdTenantRes = await apiClient.post('/tenants', tenantPayload, logout, refreshAccessToken);
@@ -1064,18 +1126,6 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
             {activeTab === 'properties' ? 'Properties' : activeTab === 'units' ? 'Units' : 'Drafts'}
           </Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            {activeTab === 'properties' && (
-              <TouchableOpacity
-                style={[styles.addBtn, { backgroundColor: isDarkMode ? '#334155' : '#e2e8f0' }]}
-                onPress={() => handleOpenAddUnit()}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="home-outline" size={14} color={colors.textPrimary} />
-                <Text style={[styles.addBtnText, { color: colors.textPrimary }]} allowFontScaling={false}>
-                  + Unit
-                </Text>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
               style={styles.addBtn}
               onPress={activeTab === 'units' ? () => handleOpenAddUnit() : handleOpenAddProperty}
@@ -1206,11 +1256,6 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                         <TouchableOpacity style={styles.btnSmall} onPress={() => setSelectedProperty(p)}>
                           <Ionicons name="eye-outline" size={14} color={colors.primary} />
                           <Text style={[styles.btnSmallText, { color: colors.primary }]} allowFontScaling={false}>View</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.btnSmall} onPress={() => handleOpenAddUnit(p.id)}>
-                          <Ionicons name="add-circle-outline" size={14} color={colors.primary} />
-                          <Text style={[styles.btnSmallText, { color: colors.primary }]} allowFontScaling={false}>+ Unit</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.btnSmall} onPress={() => handleOpenEditProperty(p)}>
@@ -2557,7 +2602,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                     ]}
                   >
                     <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle} allowFontScaling={false}>Quick Add Owner</Text>
+                      <Text style={styles.modalTitle} allowFontScaling={false}>Add Property Owner</Text>
                       <TouchableOpacity
                         onPress={() => setIsQuickAddOwnerOpen(false)}
                         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -2566,13 +2611,13 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                       </TouchableOpacity>
                     </View>
 
-                    <View style={{ marginVertical: 12 }}>
+                    <ScrollView showsVerticalScrollIndicator={false} style={{ marginVertical: 8 }}>
                       <Text style={styles.fieldLabel} allowFontScaling={false}>
                         FULL NAME <Text style={styles.requiredStar}>*</Text>
                       </Text>
                       <TextInput
                         style={styles.propInput}
-                        placeholder="e.g. John Smith"
+                        placeholder="e.g. Jane Doe"
                         placeholderTextColor={colors.placeholder}
                         value={newOwnerFullName}
                         onChangeText={setNewOwnerFullName}
@@ -2584,7 +2629,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                       </Text>
                       <TextInput
                         style={styles.propInput}
-                        placeholder="e.g. john@example.com"
+                        placeholder="jane.doe@example.com"
                         placeholderTextColor={colors.placeholder}
                         keyboardType="email-address"
                         autoCapitalize="none"
@@ -2594,18 +2639,99 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                       />
 
                       <Text style={[styles.fieldLabel, { marginTop: 10 }]} allowFontScaling={false}>
-                        PHONE NUMBER
+                        PASSWORD
+                      </Text>
+                      <View style={styles.passwordContainer}>
+                        <TextInput
+                          style={styles.passwordInput}
+                          placeholder="••••••••"
+                          placeholderTextColor={colors.placeholder}
+                          secureTextEntry={!showNewOwnerPassword}
+                          value={newOwnerPassword}
+                          onChangeText={setNewOwnerPassword}
+                          allowFontScaling={false}
+                        />
+                        <TouchableOpacity
+                          style={styles.passwordEyeBtn}
+                          onPress={() => setShowNewOwnerPassword(!showNewOwnerPassword)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={showNewOwnerPassword ? 'eye-off-outline' : 'eye-outline'}
+                            size={18}
+                            color={colors.textMuted}
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      <Text style={[styles.fieldLabel, { marginTop: 10 }]} allowFontScaling={false}>
+                        PHONE <Text style={styles.requiredStar}>*</Text>
                       </Text>
                       <TextInput
                         style={styles.propInput}
-                        placeholder="e.g. (512) 555-0199"
+                        placeholder="(555) 555-0100"
                         placeholderTextColor={colors.placeholder}
                         keyboardType="phone-pad"
                         value={newOwnerPhone}
                         onChangeText={setNewOwnerPhone}
                         allowFontScaling={false}
                       />
-                    </View>
+
+                      <Text style={[styles.fieldLabel, { marginTop: 10 }]} allowFontScaling={false}>
+                        PAYOUT METHOD
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.cleanDropdownTrigger}
+                        onPress={() => setShowOwnerPayoutDropdown(!showOwnerPayoutDropdown)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.cleanDropdownText} allowFontScaling={false} numberOfLines={1}>
+                          {newOwnerPayoutMethod || 'ACH/Direct Deposit'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+                      </TouchableOpacity>
+
+                      {showOwnerPayoutDropdown && (
+                        <View
+                          style={{
+                            marginTop: 4,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: colors.cardBorder,
+                            backgroundColor: colors.background,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {OWNER_PAYOUT_METHODS.map((pm) => {
+                            const isSelected = newOwnerPayoutMethod === pm;
+                            return (
+                              <TouchableOpacity
+                                key={pm}
+                                style={[
+                                  styles.pickerRow,
+                                  isSelected && { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' },
+                                ]}
+                                onPress={() => {
+                                  setNewOwnerPayoutMethod(pm);
+                                  setShowOwnerPayoutDropdown(false);
+                                }}
+                              >
+                                <Text
+                                  style={[
+                                    styles.cleanDropdownText,
+                                    isSelected && { color: colors.primary, fontWeight: '700' },
+                                  ]}
+                                  allowFontScaling={false}
+                                >
+                                  {pm}
+                                </Text>
+                                {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </ScrollView>
 
                     <View style={styles.modalBtnRow}>
                       <TouchableOpacity
@@ -2625,7 +2751,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                           <ActivityIndicator size="small" color="#ffffff" />
                         ) : (
                           <Text style={[styles.submitBtnText, { color: '#ffffff' }]} allowFontScaling={false}>
-                            Add Owner
+                            Save Owner
                           </Text>
                         )}
                       </TouchableOpacity>
@@ -3273,14 +3399,14 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                       </View>
                     )}
 
-                    {/* ADDITIONAL DETAILS (OPTIONAL) */}
+                    {/* ADDITIONAL DETAILS (OPTIONAL) - Matching Web 1:1 */}
                     <View style={styles.extraAccordionHeader}>
                       <View style={{ flex: 1, paddingRight: 8 }}>
                         <Text style={styles.subSectionTitle} allowFontScaling={false}>
                           ADDITIONAL DETAILS (OPTIONAL)
                         </Text>
                         <Text style={styles.cleanHelperText} allowFontScaling={false} numberOfLines={1}>
-                          Government IDs, Emergency Contacts & Employer
+                          Government IDs, Emergency Contacts, Employment Parameters & Address History
                         </Text>
                       </View>
                       <TouchableOpacity
@@ -3289,41 +3415,179 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                         activeOpacity={0.7}
                       >
                         <Text style={styles.accordionToggleText} allowFontScaling={false}>
-                          {showTenantExtra ? 'Hide ⌃' : 'Show ⌵'}
+                          {showTenantExtra ? 'Hide Details ⌃' : 'Show Details ⌵'}
                         </Text>
                       </TouchableOpacity>
                     </View>
 
                     {showTenantExtra && (
-                      <View style={{ marginTop: 8 }}>
+                      <View style={{ marginTop: 6 }}>
+                        {/* 1. GOVERNMENT IDS (OPTIONAL) */}
+                        <Text style={styles.subSectionDividerHeader} allowFontScaling={false}>
+                          Government IDs (Optional)
+                        </Text>
                         <View style={styles.twoColRow}>
                           <View style={styles.twoColField}>
-                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>SSN / TAX ID</Text>
-                            <TextInput style={styles.cleanInput} placeholder="XXX-XX-XXXX" placeholderTextColor={colors.placeholder} value={tSsn} onChangeText={setTSsn} allowFontScaling={false} />
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>ID TYPE</Text>
+                            <TouchableOpacity
+                              style={styles.cleanDropdownTrigger}
+                              onPress={() => setActiveUnitDropdown('idType')}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.cleanDropdownText} allowFontScaling={false} numberOfLines={1}>
+                                {tIdType || 'Driver License'}
+                              </Text>
+                              <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+                            </TouchableOpacity>
                           </View>
                           <View style={styles.twoColField}>
                             <Text style={styles.cleanFieldLabel} allowFontScaling={false}>ID NUMBER</Text>
-                            <TextInput style={styles.cleanInput} placeholder="DL-123456" placeholderTextColor={colors.placeholder} value={tIdNumber} onChangeText={setTIdNumber} allowFontScaling={false} />
+                            <TextInput
+                              style={styles.cleanInput}
+                              placeholder="A1234567"
+                              placeholderTextColor={colors.placeholder}
+                              value={tIdNumber}
+                              onChangeText={setTIdNumber}
+                              allowFontScaling={false}
+                            />
                           </View>
                         </View>
+
+                        {/* 2. EMERGENCY CONTACT (OPTIONAL) */}
+                        <Text style={styles.subSectionDividerHeader} allowFontScaling={false}>
+                          Emergency Contact (Optional)
+                        </Text>
                         <View style={styles.twoColRow}>
                           <View style={styles.twoColField}>
-                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>EMERGENCY CONTACT</Text>
-                            <TextInput style={styles.cleanInput} placeholder="Jane Doe" placeholderTextColor={colors.placeholder} value={tEmergencyName} onChangeText={setTEmergencyName} allowFontScaling={false} />
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>CONTACT NAME</Text>
+                            <TextInput
+                              style={styles.cleanInput}
+                              placeholder="Mary Doe"
+                              placeholderTextColor={colors.placeholder}
+                              value={tEmergencyName}
+                              onChangeText={setTEmergencyName}
+                              allowFontScaling={false}
+                            />
                           </View>
                           <View style={styles.twoColField}>
-                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>EMERGENCY PHONE</Text>
-                            <TextInput style={styles.cleanInput} keyboardType="phone-pad" placeholder="(512) 555-9999" placeholderTextColor={colors.placeholder} value={tEmergencyPhone} onChangeText={setTEmergencyPhone} allowFontScaling={false} />
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>RELATIONSHIP</Text>
+                            <TextInput
+                              style={styles.cleanInput}
+                              placeholder="Spouse / Parent"
+                              placeholderTextColor={colors.placeholder}
+                              value={tEmergencyRelationship}
+                              onChangeText={setTEmergencyRelationship}
+                              allowFontScaling={false}
+                            />
                           </View>
                         </View>
+                        <View style={{ marginTop: 8 }}>
+                          <Text style={styles.cleanFieldLabel} allowFontScaling={false}>EMERGENCY PHONE</Text>
+                          <TextInput
+                            style={styles.cleanInput}
+                            keyboardType="phone-pad"
+                            placeholder="(512) 555-9876"
+                            placeholderTextColor={colors.placeholder}
+                            value={tEmergencyPhone}
+                            onChangeText={setTEmergencyPhone}
+                            allowFontScaling={false}
+                          />
+                        </View>
+
+                        {/* 3. EMPLOYMENT PARAMETERS (OPTIONAL) */}
+                        <Text style={styles.subSectionDividerHeader} allowFontScaling={false}>
+                          Employment Parameters (Optional)
+                        </Text>
                         <View style={styles.twoColRow}>
                           <View style={styles.twoColField}>
-                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>EMPLOYER</Text>
-                            <TextInput style={styles.cleanInput} placeholder="Acme Corp" placeholderTextColor={colors.placeholder} value={tEmployer} onChangeText={setTEmployer} allowFontScaling={false} />
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>EMPLOYER NAME (CURRENT JOB)</Text>
+                            <TextInput
+                              style={styles.cleanInput}
+                              placeholder="Google Inc."
+                              placeholderTextColor={colors.placeholder}
+                              value={tEmployer}
+                              onChangeText={setTEmployer}
+                              allowFontScaling={false}
+                            />
                           </View>
                           <View style={styles.twoColField}>
-                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>WORK PHONE</Text>
-                            <TextInput style={styles.cleanInput} keyboardType="phone-pad" placeholder="(512) 555-8888" placeholderTextColor={colors.placeholder} value={tEmployerPhone} onChangeText={setTEmployerPhone} allowFontScaling={false} />
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>POSITION</Text>
+                            <TextInput
+                              style={styles.cleanInput}
+                              placeholder="Staff Engineer"
+                              placeholderTextColor={colors.placeholder}
+                              value={tPosition}
+                              onChangeText={setTPosition}
+                              allowFontScaling={false}
+                            />
+                          </View>
+                        </View>
+                        <View style={[styles.twoColRow, { marginTop: 8 }]}>
+                          <View style={styles.twoColField}>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>JOB PHONE NUMBER</Text>
+                            <TextInput
+                              style={styles.cleanInput}
+                              keyboardType="phone-pad"
+                              placeholder="(512) 555-1122 (Optional)"
+                              placeholderTextColor={colors.placeholder}
+                              value={tEmployerPhone}
+                              onChangeText={setTEmployerPhone}
+                              allowFontScaling={false}
+                            />
+                          </View>
+                          <View style={styles.twoColField}>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>MONTHLY INCOME ($)</Text>
+                            <TextInput
+                              style={styles.cleanInput}
+                              keyboardType="numeric"
+                              placeholder="e.g. 3500"
+                              placeholderTextColor={colors.placeholder}
+                              value={tMonthlyIncome}
+                              onChangeText={setTMonthlyIncome}
+                              allowFontScaling={false}
+                            />
+                          </View>
+                        </View>
+                        <View style={{ marginTop: 8 }}>
+                          <Text style={styles.cleanFieldLabel} allowFontScaling={false}>STATUS</Text>
+                          <TouchableOpacity
+                            style={styles.cleanDropdownTrigger}
+                            onPress={() => setActiveUnitDropdown('employmentStatus')}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.cleanDropdownText} allowFontScaling={false} numberOfLines={1}>
+                              {tEmploymentStatus || 'Full-Time'}
+                            </Text>
+                            <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* 4. ADDRESS HISTORY (OPTIONAL) */}
+                        <Text style={styles.subSectionDividerHeader} allowFontScaling={false}>
+                          Address History (Optional)
+                        </Text>
+                        <View style={{ gap: 8 }}>
+                          <View>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>CURRENT ADDRESS</Text>
+                            <TextInput
+                              style={styles.cleanInput}
+                              placeholder="789 Pine Rd, Austin, TX"
+                              placeholderTextColor={colors.placeholder}
+                              value={tCurrentAddress}
+                              onChangeText={setTCurrentAddress}
+                              allowFontScaling={false}
+                            />
+                          </View>
+                          <View>
+                            <Text style={styles.cleanFieldLabel} allowFontScaling={false}>PREVIOUS ADDRESS (OPTIONAL)</Text>
+                            <TextInput
+                              style={styles.cleanInput}
+                              placeholder="456 Elm St, Dallas, TX"
+                              placeholderTextColor={colors.placeholder}
+                              value={tPreviousAddress}
+                              onChangeText={setTPreviousAddress}
+                              allowFontScaling={false}
+                            />
                           </View>
                         </View>
                       </View>
@@ -3334,10 +3598,10 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                       <Ionicons name="shield-checkmark" size={18} color={colors.success} style={{ marginTop: 2, marginRight: 8 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.workflowBannerTitle} allowFontScaling={false}>
-                          Automated Move-In Execution:
+                          Automated Workflow Execution:
                         </Text>
                         <Text style={styles.workflowBannerText} allowFontScaling={false}>
-                          Submitting auto-generates resident account, active lease, bypasses screening, and marks Move-In as completed.
+                          Submitting will automatically create the Active Tenant account with portal password, generate an Active Lease agreement, auto-bypass screening, and mark Move-In Workflow as COMPLETED.
                         </Text>
                       </View>
                     </View>
@@ -3497,6 +3761,106 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                     <TouchableOpacity
                       style={styles.closeBtn}
                       onPress={() => setShowUnitPropDropdown(false)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.closeBtnText} allowFontScaling={false}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* ------------------------------------------------------------------ */}
+              {/* IN-MODAL UNIT ADDITIONAL DROPDOWN OVERLAY (ID TYPE / STATUS) */}
+              {/* ------------------------------------------------------------------ */}
+              {!!activeUnitDropdown && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 100003,
+                    elevation: 100003,
+                    borderRadius: 14,
+                    padding: 16,
+                  }}
+                >
+                  <TouchableOpacity
+                    style={StyleSheet.absoluteFillObject}
+                    activeOpacity={1}
+                    onPress={() => setActiveUnitDropdown(null)}
+                  />
+                  <View
+                    style={[
+                      styles.modalCard,
+                      {
+                        width: '100%',
+                        maxWidth: 420,
+                        maxHeight: '70%',
+                        zIndex: 100004,
+                        elevation: 100004,
+                        backgroundColor: colors.surface,
+                        borderColor: colors.cardBorder,
+                        borderWidth: 1,
+                        padding: 16,
+                        borderRadius: 14,
+                      },
+                    ]}
+                  >
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle} allowFontScaling={false}>
+                        {activeUnitDropdown === 'idType' ? 'Select ID Type' : 'Select Employment Status'}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setActiveUnitDropdown(null)}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Ionicons name="close" size={20} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={{ maxHeight: 280, marginVertical: 8 }} showsVerticalScrollIndicator={false}>
+                      {(activeUnitDropdown === 'idType' ? ID_TYPES : EMPLOYMENT_STATUSES).map((itemVal) => {
+                        const isSelected = activeUnitDropdown === 'idType' ? tIdType === itemVal : tEmploymentStatus === itemVal;
+                        return (
+                          <TouchableOpacity
+                            key={itemVal}
+                            style={[
+                              styles.pickerRow,
+                              isSelected && { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' },
+                            ]}
+                            onPress={() => {
+                              if (activeUnitDropdown === 'idType') {
+                                setTIdType(itemVal);
+                              } else {
+                                setTEmploymentStatus(itemVal);
+                              }
+                              setActiveUnitDropdown(null);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.cleanDropdownText,
+                                isSelected && { color: colors.primary, fontWeight: '700' },
+                              ]}
+                              allowFontScaling={false}
+                            >
+                              {itemVal}
+                            </Text>
+                            {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+
+                    <TouchableOpacity
+                      style={styles.closeBtn}
+                      onPress={() => setActiveUnitDropdown(null)}
                       activeOpacity={0.7}
                     >
                       <Text style={styles.closeBtnText} allowFontScaling={false}>Done</Text>
@@ -4713,6 +5077,18 @@ const getStyles = (colors, isDarkMode) =>
       fontSize: 11,
       fontWeight: '700',
       color: colors.textPrimary,
+    },
+    subSectionDividerHeader: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.cardBorder,
+      paddingBottom: 4,
+      marginTop: 12,
+      marginBottom: 8,
     },
     workflowBannerClean: {
       flexDirection: 'row',

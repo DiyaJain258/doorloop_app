@@ -87,6 +87,7 @@ export const TenantDashboard = ({ onNavigate }) => {
   const [screeningSsn, setScreeningSsn] = useState('');
   const [docFile, setDocFile] = useState(null);
   const [consent, setConsent] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Notice Parsers
   const getNoticeSubject = (notice) => {
@@ -157,6 +158,10 @@ export const TenantDashboard = ({ onNavigate }) => {
       };
 
       const isolatedNotifs = (Array.isArray(notifs) ? notifs : []).filter((n) => isNoticeForTenant(n, tenantCtx));
+
+      // Calculate unread count for bell badge
+      const unreadTotal = isolatedNotifs.filter((n) => !n.read && !n.isRead).length;
+      setUnreadCount(unreadTotal);
 
       // Check for unread management notices
       if (isolatedNotifs.length > 0) {
@@ -355,20 +360,44 @@ export const TenantDashboard = ({ onNavigate }) => {
     >
       {/* Welcome Header */}
       <View style={styles.welcomeSection}>
-        <TouchableOpacity
-          onPress={() => onNavigate && onNavigate('profile')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.welcomeGreeting, { color: colors.textPrimary }]} allowFontScaling={false}>
-            Hello, {tenantData.name} 👋
-          </Text>
-        </TouchableOpacity>
-        <View style={styles.unitLocationRow}>
-          <Ionicons name="location-sharp" size={13} color="#38bdf8" style={{ marginRight: 4 }} />
-          <Text style={[styles.welcomeLocation, { color: colors.textSecondary }]} allowFontScaling={false}>
-            {tenantData.propertyName} {tenantData.unitNumber && tenantData.unitNumber !== 'N/A' ? `· Unit ${tenantData.unitNumber}` : ''}
-          </Text>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <TouchableOpacity
+            onPress={() => onNavigate && onNavigate('profile')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.welcomeGreeting, { color: colors.textPrimary }]} allowFontScaling={false}>
+              Hello, {tenantData.name} 👋
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.unitLocationRow}>
+            <Ionicons name="location-sharp" size={13} color="#38bdf8" style={{ marginRight: 4 }} />
+            <Text style={[styles.welcomeLocation, { color: colors.textSecondary }]} allowFontScaling={false} numberOfLines={1}>
+              {tenantData.propertyName} {tenantData.unitNumber && tenantData.unitNumber !== 'N/A' ? `· Unit ${tenantData.unitNumber}` : ''}
+            </Text>
+          </View>
         </View>
+
+        <TouchableOpacity
+          style={[
+            styles.bellBtn,
+            {
+              backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              borderColor: colors.cardBorder,
+            },
+          ]}
+          onPress={() => onNavigate && onNavigate('notifications')}
+          activeOpacity={0.7}
+          accessibilityLabel="Notifications"
+        >
+          <Ionicons name="notifications-outline" size={20} color={colors.textPrimary} />
+          {unreadCount > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Compact Management Notice Strip (1-Line Only, Click to Read) */}
@@ -401,7 +430,7 @@ export const TenantDashboard = ({ onNavigate }) => {
 
       {/* Screening Verification Banner (If pending) */}
       {screeningReport &&
-        (screeningReport.status === 'Pending Documents' || screeningReport.status === 'Pending Consent') && (
+        (screeningReport.status === 'Pending' || screeningReport.status === 'Pending Documents' || screeningReport.status === 'Pending Consent') && (
           <TouchableOpacity
             style={[styles.alertBanner, { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}
             onPress={() => setScreeningModalOpen(true)}
@@ -1180,6 +1209,9 @@ const getStyles = (colors, isDarkMode) =>
 
     // Header
     welcomeSection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       marginBottom: 14,
       paddingHorizontal: 4,
     },
@@ -1196,6 +1228,34 @@ const getStyles = (colors, isDarkMode) =>
     welcomeLocation: {
       fontSize: 13,
       fontWeight: '600',
+    },
+    bellBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+      borderWidth: 1,
+    },
+    bellBadge: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+      backgroundColor: '#ef4444',
+      borderRadius: 9,
+      minWidth: 16,
+      height: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+      borderWidth: 1.5,
+      borderColor: colors.background,
+    },
+    bellBadgeText: {
+      color: '#ffffff',
+      fontSize: 8.5,
+      fontWeight: '900',
     },
 
     // Notice Strip (1-Line Compact Banner)

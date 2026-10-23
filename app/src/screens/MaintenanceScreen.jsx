@@ -490,50 +490,50 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
       });
       setViolations(parsedViolations);
 
-      // 4. Maintenance Staff & Vendors - Web API parity (api.vendors.getAll())
+      // 4. Maintenance Staff & Vendors - Web API parity (api.vendors.getAll() + company-users)
       let staffList = [];
+      const rawVendors = Array.isArray(staffRes) ? staffRes : (staffRes?.data && Array.isArray(staffRes.data) ? staffRes.data : []);
+      if (rawVendors.length > 0) {
+        staffList = rawVendors.map(v => ({
+          id: v.id,
+          name: v.companyName || v.name,
+          companyName: v.companyName || v.name,
+          contactName: v.contactName || v.primaryContact || v.name,
+          email: v.email,
+          phone: v.phone || '',
+          category: v.serviceType || v.category || 'General Maintenance',
+          serviceType: v.serviceType || v.category || 'General Maintenance',
+          rating: v.rating || 5.0,
+          activeJobs: v.activeJobs || 0,
+          completedJobs: v.completedJobs || 0,
+          status: v.status || 'Active',
+        }));
+      }
+
       try {
         const compRes = await apiClient.get('/superadmin/company-users', logout, refreshAccessToken).catch(() => null);
         const cUsers = Array.isArray(compRes) ? compRes : (compRes?.data && Array.isArray(compRes.data) ? compRes.data : []);
         const maintUsers = cUsers.filter(u => u.role === 'Maintenance Staff' || u.role === 'Maintenance');
-        if (maintUsers.length > 0) {
-          staffList = maintUsers.map(u => ({
-            id: u.id,
-            name: u.name,
-            companyName: u.name,
-            contactName: u.name,
-            email: u.email,
-            phone: u.phone || '',
-            category: u.serviceType || 'General Maintenance',
-            serviceType: u.serviceType || 'General Maintenance',
-            rating: 5.0,
-            activeJobs: 0,
-            completedJobs: 0,
-            status: u.status || 'Active',
-          }));
-        }
+        maintUsers.forEach(u => {
+          if (!staffList.some(s => s.id === u.id || (u.email && s.email === u.email))) {
+            staffList.push({
+              id: u.id,
+              name: u.name,
+              companyName: u.name,
+              contactName: u.name,
+              email: u.email,
+              phone: u.phone || '',
+              category: u.serviceType || 'General Maintenance',
+              serviceType: u.serviceType || 'General Maintenance',
+              rating: 5.0,
+              activeJobs: 0,
+              completedJobs: 0,
+              status: u.status || 'Active',
+            });
+          }
+        });
       } catch (err) {
         console.log('company-users err:', err.message);
-      }
-
-      if (staffList.length === 0) {
-        const rawVendors = Array.isArray(staffRes) ? staffRes : (staffRes?.data && Array.isArray(staffRes.data) ? staffRes.data : []);
-        if (rawVendors.length > 0) {
-          staffList = rawVendors.map(v => ({
-            id: v.id,
-            name: v.companyName || v.name,
-            companyName: v.companyName || v.name,
-            contactName: v.contactName || v.primaryContact || v.name,
-            email: v.email,
-            phone: v.phone || '',
-            category: v.serviceType || v.category || 'General Maintenance',
-            serviceType: v.serviceType || v.category || 'General Maintenance',
-            rating: v.rating || 5.0,
-            activeJobs: v.activeJobs || 0,
-            completedJobs: v.completedJobs || 0,
-            status: v.status || 'Active',
-          }));
-        }
       }
       setStaff(staffList);
 
@@ -1383,7 +1383,7 @@ export const MaintenanceScreen = ({ initialTab = 'dashboard', onNavigate }) => {
               {activeTab === 'staff' && (
                 <TouchableOpacity style={[styles.addBtn, { backgroundColor: '#10b981' }]} onPress={handleOpenAddVendor} activeOpacity={0.8}>
                   <Ionicons name="add" size={18} color="#ffffff" />
-                  <Text style={[styles.addBtnText, { color: '#ffffff' }]} allowFontScaling={false}>+ Add Vendor</Text>
+                  <Text style={[styles.addBtnText, { color: '#ffffff' }]} allowFontScaling={false}>+ Register Staff</Text>
                 </TouchableOpacity>
               )}
             </View>

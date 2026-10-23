@@ -12,7 +12,7 @@ LogBox.ignoreLogs([
 
 import { SplashScreen } from './components/SplashScreen';
 import { LoginScreen } from './screens/LoginScreen';
-import { GlobalHeader } from './components/GlobalHeader';
+import { NotificationsScreen } from './screens/NotificationsScreen';
 
 import { AdminDashboard } from './screens/AdminDashboard';
 import { ManagerDashboard } from './screens/ManagerDashboard';
@@ -47,6 +47,7 @@ import { TenantProfileScreen } from './screens/TenantProfileScreen';
 import { OwnerFinancialsScreen } from './screens/OwnerFinancialsScreen';
 import { OwnerMaintenanceScreen } from './screens/OwnerMaintenanceScreen';
 import { OwnerReportsScreen } from './screens/OwnerReportsScreen';
+import { OwnerPropertiesScreen } from './screens/OwnerPropertiesScreen';
 import { OwnerServicesScreen } from './screens/OwnerServicesScreen';
 import { ManagerServicesScreen } from './screens/ManagerServicesScreen';
 import { IntegrationsScreen } from './screens/IntegrationsScreen';
@@ -153,7 +154,7 @@ export default function App() {
       case 'connected':
         setActiveTab('company-settings');
         setActiveSubTab(
-          subTab || (tabId === 'admin' || tabId === 'company-settings' ? 'profile' : tabId)
+          subTab || (tabId === 'admin' || tabId === 'company-settings' ? 'menu' : tabId)
         );
         break;
 
@@ -287,7 +288,7 @@ export default function App() {
       case 'Collection Manager':
         return <CollectionDashboard onNavigate={handleNavigate} />;
       case 'Maintenance Staff':
-        return <MaintenanceStaffDashboard activeSubTab="dashboard" />;
+        return <MaintenanceStaffDashboard activeSubTab="dashboard" onNavigate={handleNavigate} />;
       case 'Owner':
         return <OwnerDashboard onNavigate={handleNavigate} />;
       case 'Tenant':
@@ -326,7 +327,7 @@ export default function App() {
       case 'leasing':
         return role === 'Tenant' ? <TenantLeaseScreen /> : <LeadsScreen initialTab={activeSubTab || 'leases'} onNavigate={handleNavigate} />;
       case 'properties':
-        return <PropertiesScreen initialTab={activeSubTab || 'properties'} />;
+        return role === 'Owner' ? <OwnerPropertiesScreen onNavigate={handleNavigate} /> : <PropertiesScreen initialTab={activeSubTab || 'properties'} />;
       case 'units':
         return <PropertiesScreen initialTab="units" />;
       case 'drafts':
@@ -356,7 +357,7 @@ export default function App() {
       case 'messages':
         return role === 'Property Manager' ? <ManagerCommunicationScreen /> : <TenantMessagesScreen />;
       case 'notifications':
-        return <TenantNotificationsScreen onNavigate={handleNavigate} />;
+        return <NotificationsScreen onNavigate={handleNavigate} />;
       case 'statements':
         return <StatementsScreen />;
       case 'reports':
@@ -412,12 +413,12 @@ export default function App() {
         return <AIAssistantScreen onNavigate={handleNavigate} />;
       case 'company-settings':
       case 'admin':
-        return <CompanySettingsScreen initialTab={activeSubTab || 'profile'} onNavigate={handleNavigate} />;
+        return <CompanySettingsScreen initialTab={activeSubTab || 'menu'} onNavigate={handleNavigate} />;
       case 'profile':
         if (role === 'Tenant') {
           return <TenantProfileScreen onNavigate={handleNavigate} />;
         }
-        return <ProfileScreen />;
+        return <ProfileScreen onNavigate={handleNavigate} />;
       case 'more':
         if (role === 'Tenant') {
           return (
@@ -474,13 +475,9 @@ export default function App() {
     <View style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      {/* Top-Bar & Global Header Controls (Theme, Language EN/ES/HI, Notifications, Profile Pill) */}
-      <GlobalHeader
-        onNavigate={handleNavigate}
-      />
 
       {/* Main Screen Content */}
-      <View style={styles.content}>
+      <View style={[styles.content, activeTab !== 'dashboard' && styles.nonDashboardContent]}>
         {renderScreen()}
       </View>
 
@@ -580,6 +577,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  nonDashboardContent: {
+    paddingTop: Platform.OS === 'ios' ? 16 : 14,
   },
   bottomBarContainer: {
     backgroundColor: '#1e293b',

@@ -26,6 +26,14 @@ import { CustomDatePicker } from '../components/CustomDatePicker';
 const PAGE_SIZE = 10;
 const CHART_COLORS = ['#10b981', '#38bdf8', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+const formatCurrency = (val) => {
+  const num = Number(val) || 0;
+  if (num < 0) {
+    return `-$${Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
   const { logout, refreshAccessToken } = useAuthStore();
   const { language } = useThemeStore();
@@ -742,54 +750,62 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
         </View>
 
         {/* Tab Switcher - 4 Submenus identical to Web */}
-        <View style={styles.tabRow}>
-          <TouchableOpacity
-            style={[styles.tabItem, activeTab === 'dashboard' && styles.tabItemActive]}
-            onPress={() => setActiveTab('dashboard')}
+        <View style={{ marginTop: 10 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingRight: 10 }}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
           >
-            <Text
-              style={[styles.tabItemText, activeTab === 'dashboard' && styles.tabItemTextActive]}
-              allowFontScaling={false}
+            <TouchableOpacity
+              style={[styles.tabItem, activeTab === 'dashboard' && styles.tabItemActive]}
+              onPress={() => setActiveTab('dashboard')}
             >
-              {language === 'es' ? 'Panel' : language === 'hi' ? 'डैशबोर्ड' : 'Dashboard'}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[styles.tabItemText, activeTab === 'dashboard' && styles.tabItemTextActive]}
+                allowFontScaling={false}
+              >
+                {language === 'es' ? 'Panel' : language === 'hi' ? 'डैशबोर्ड' : 'Dashboard'}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tabItem, activeTab === 'payments' && styles.tabItemActive]}
-            onPress={() => setActiveTab('payments')}
-          >
-            <Text
-              style={[styles.tabItemText, activeTab === 'payments' && styles.tabItemTextActive]}
-              allowFontScaling={false}
+            <TouchableOpacity
+              style={[styles.tabItem, activeTab === 'payments' && styles.tabItemActive]}
+              onPress={() => setActiveTab('payments')}
             >
-              {language === 'es' ? 'Pagos' : language === 'hi' ? 'भुगतान' : 'Payments'}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[styles.tabItemText, activeTab === 'payments' && styles.tabItemTextActive]}
+                allowFontScaling={false}
+              >
+                {language === 'es' ? 'Pagos' : language === 'hi' ? 'भुगतान' : 'Payments'}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tabItem, activeTab === 'invoices' && styles.tabItemActive]}
-            onPress={() => setActiveTab('invoices')}
-          >
-            <Text
-              style={[styles.tabItemText, activeTab === 'invoices' && styles.tabItemTextActive]}
-              allowFontScaling={false}
+            <TouchableOpacity
+              style={[styles.tabItem, activeTab === 'invoices' && styles.tabItemActive]}
+              onPress={() => setActiveTab('invoices')}
             >
-              {language === 'es' ? 'Facturas' : language === 'hi' ? 'चालान' : 'Invoices'}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[styles.tabItemText, activeTab === 'invoices' && styles.tabItemTextActive]}
+                allowFontScaling={false}
+              >
+                {language === 'es' ? 'Facturas' : language === 'hi' ? 'चालान' : 'Invoices'}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tabItem, activeTab === 'ledger' && styles.tabItemActive]}
-            onPress={() => setActiveTab('ledger')}
-          >
-            <Text
-              style={[styles.tabItemText, activeTab === 'ledger' && styles.tabItemTextActive]}
-              allowFontScaling={false}
+            <TouchableOpacity
+              style={[styles.tabItem, activeTab === 'ledger' && styles.tabItemActive]}
+              onPress={() => setActiveTab('ledger')}
             >
-              {language === 'es' ? 'Libro' : language === 'hi' ? 'खाता बही' : 'Rent Ledger'}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[styles.tabItemText, activeTab === 'ledger' && styles.tabItemTextActive]}
+                allowFontScaling={false}
+              >
+                {language === 'es' ? 'Libro' : language === 'hi' ? 'खाता बही' : 'Rent Ledger'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
 
         {/* Search bar & Primary CTA button */}
@@ -818,29 +834,41 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
             )}
           </View>
 
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => {
-              if (activeTab === 'invoices') {
-                setCreateInvoiceOpen(true);
-              } else {
-                setRecordPaymentOpen(true);
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={16} color="#0f172a" />
-            <Text style={styles.addBtnText} allowFontScaling={false}>
-              {activeTab === 'invoices'
-                ? language === 'es' ? '+ Factura' : '+ Invoice'
-                : language === 'es' ? '+ Pago Offline' : '+ Record Payment'}
-            </Text>
-          </TouchableOpacity>
+          {activeTab === 'invoices' && (
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setCreateInvoiceOpen(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={16} color="#0f172a" />
+              <Text style={styles.addBtnText} allowFontScaling={false}>
+                {language === 'es' ? 'Factura' : 'Invoice'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {activeTab === 'payments' && (
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setRecordPaymentOpen(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={16} color="#0f172a" />
+              <Text style={styles.addBtnText} allowFontScaling={false}>
+                {language === 'es' ? 'Pago' : 'Record Payment'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Filter Pills */}
         {activeTab !== 'dashboard' && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterPillsScroll}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingRight: 16, alignItems: 'center' }}
+            style={styles.filterPillsScroll}
+          >
             {/* Status Filter Pill */}
             {(activeTab === 'payments' || activeTab === 'invoices') && (
               <View style={styles.pillContainer}>
@@ -861,6 +889,7 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
             {/* Method Filter Pill for Payments */}
             {activeTab === 'payments' && (
               <View style={styles.pillContainer}>
+                <View style={styles.filterDivider} />
                 {['', 'Zelle', 'Cash', 'Check', 'ACH'].map((m) => (
                   <TouchableOpacity
                     key={m || 'all-m'}
@@ -1133,13 +1162,10 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
                 ) : (
                   paginatedPayments.map((item) => (
                     <View key={item.id} style={styles.recordsCard}>
-                      <View style={styles.rowBetween}>
-                        <View style={{ flex: 1 }}>
+                      {/* Top Header Row: Receipt # on Left, Badges on Right */}
+                      <View style={styles.cardHeaderRow}>
+                        <View style={styles.numTag}>
                           <Text style={styles.coaNum} allowFontScaling={false}>{item.receiptNumber}</Text>
-                          <Text style={styles.recordLabel} allowFontScaling={false}>{item.tenantName}</Text>
-                          <Text style={styles.recordSubText} allowFontScaling={false}>
-                            {item.propertyName} · Unit {item.unitNumber}
-                          </Text>
                         </View>
                         <View style={styles.badgesRow}>
                           <View style={[styles.badge, { borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
@@ -1151,17 +1177,26 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
                         </View>
                       </View>
 
+                      {/* Resident Info */}
+                      <View style={{ marginTop: 8, marginBottom: 8 }}>
+                        <Text style={styles.recordLabel} allowFontScaling={false}>{item.tenantName}</Text>
+                        <Text style={styles.recordSubText} allowFontScaling={false}>
+                          {item.propertyName} · Unit {item.unitNumber}
+                        </Text>
+                      </View>
+
                       <View style={styles.divider} />
 
+                      {/* Key-Value Details */}
                       <View style={styles.rowBetween}>
-                        <Text style={styles.recordSubText} allowFontScaling={false}>
+                        <Text style={styles.detailLabelText} allowFontScaling={false}>
                           {language === 'es' ? 'Fecha de Cobro' : 'Date Paid'}
                         </Text>
                         <Text style={styles.recordSubTextVal} allowFontScaling={false}>{item.paidDate || 'N/A'}</Text>
                       </View>
 
-                      <View style={styles.rowBetween}>
-                        <Text style={styles.recordSubText} allowFontScaling={false}>
+                      <View style={[styles.rowBetween, { marginTop: 4 }]}>
+                        <Text style={styles.detailLabelText} allowFontScaling={false}>
                           {language === 'es' ? 'Monto Recibido' : 'Amount Paid'}
                         </Text>
                         <Text style={[styles.recordValue, { color: '#10b981' }]} allowFontScaling={false}>
@@ -1176,18 +1211,18 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
                           onPress={() => setSelectedReceipt(item)}
                           activeOpacity={0.7}
                         >
-                          <Ionicons name="eye-outline" size={15} color="#38bdf8" style={{ marginRight: 4 }} />
+                          <Ionicons name="eye-outline" size={14} color="#38bdf8" style={{ marginRight: 4 }} />
                           <Text style={[styles.cardActionBtnText, { color: '#38bdf8' }]} allowFontScaling={false}>
                             View Receipt
                           </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.cardActionBtn, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}
+                          style={[styles.cardActionBtn, { borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.06)' }]}
                           onPress={() => handleDeletePayment(item)}
                           activeOpacity={0.7}
                         >
-                          <Ionicons name="trash-outline" size={15} color="#ef4444" style={{ marginRight: 4 }} />
+                          <Ionicons name="trash-outline" size={14} color="#ef4444" style={{ marginRight: 4 }} />
                           <Text style={[styles.cardActionBtnText, { color: '#ef4444' }]} allowFontScaling={false}>
                             Delete
                           </Text>
@@ -1264,13 +1299,10 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
 
                     return (
                       <View key={item.id} style={styles.recordsCard}>
-                        <View style={styles.rowBetween}>
-                          <View style={{ flex: 1, marginRight: 8 }}>
+                        {/* Top Header Row: Invoice # on Left, Status Badge on Right */}
+                        <View style={styles.cardHeaderRow}>
+                          <View style={styles.numTag}>
                             <Text style={styles.coaNum} allowFontScaling={false}>{item.invoiceNumber}</Text>
-                            <Text style={styles.recordLabel} allowFontScaling={false}>{item.tenantName}</Text>
-                            <Text style={styles.recordSubText} allowFontScaling={false}>
-                              {item.propertyName} · Unit {item.unitNumber}
-                            </Text>
                           </View>
                           <View style={[styles.badge, { borderColor: statusColor, backgroundColor: `${statusColor}14` }]}>
                             <Text style={[styles.badgeText, { color: statusColor }]} allowFontScaling={false}>
@@ -1279,17 +1311,26 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
                           </View>
                         </View>
 
+                        {/* Resident Info */}
+                        <View style={{ marginTop: 8, marginBottom: 8 }}>
+                          <Text style={styles.recordLabel} allowFontScaling={false}>{item.tenantName}</Text>
+                          <Text style={styles.recordSubText} allowFontScaling={false}>
+                            {item.propertyName} · Unit {item.unitNumber}
+                          </Text>
+                        </View>
+
                         <View style={styles.divider} />
 
+                        {/* Key-Value Details */}
                         <View style={styles.rowBetween}>
-                          <Text style={styles.recordSubText} allowFontScaling={false}>
+                          <Text style={styles.detailLabelText} allowFontScaling={false}>
                             {language === 'es' ? 'Fecha Vencimiento' : 'Due Date'}
                           </Text>
                           <Text style={styles.recordSubTextVal} allowFontScaling={false}>{item.dueDate}</Text>
                         </View>
 
-                        <View style={styles.rowBetween}>
-                          <Text style={styles.recordSubText} allowFontScaling={false}>
+                        <View style={[styles.rowBetween, { marginTop: 4 }]}>
+                          <Text style={styles.detailLabelText} allowFontScaling={false}>
                             {language === 'es' ? 'Monto de Factura' : 'Invoice Amount'}
                           </Text>
                           <Text style={styles.recordSubTextVal} allowFontScaling={false}>
@@ -1297,8 +1338,8 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
                           </Text>
                         </View>
 
-                        <View style={styles.rowBetween}>
-                          <Text style={styles.recordSubText} allowFontScaling={false}>
+                        <View style={[styles.rowBetween, { marginTop: 4 }]}>
+                          <Text style={styles.detailLabelText} allowFontScaling={false}>
                             {language === 'es' ? 'Saldo Pendiente' : 'Outstanding Balance'}
                           </Text>
                           <Text
@@ -1319,18 +1360,18 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
                             onPress={() => setSelectedInvoice(item)}
                             activeOpacity={0.7}
                           >
-                            <Ionicons name="eye-outline" size={15} color="#38bdf8" style={{ marginRight: 4 }} />
+                            <Ionicons name="eye-outline" size={14} color="#38bdf8" style={{ marginRight: 4 }} />
                             <Text style={[styles.cardActionBtnText, { color: '#38bdf8' }]} allowFontScaling={false}>
                               View Details
                             </Text>
                           </TouchableOpacity>
 
                           <TouchableOpacity
-                            style={[styles.cardActionBtn, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}
+                            style={[styles.cardActionBtn, { borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.06)' }]}
                             onPress={() => handleDeleteInvoice(item)}
                             activeOpacity={0.7}
                           >
-                            <Ionicons name="trash-outline" size={15} color="#ef4444" style={{ marginRight: 4 }} />
+                            <Ionicons name="trash-outline" size={14} color="#ef4444" style={{ marginRight: 4 }} />
                             <Text style={[styles.cardActionBtnText, { color: '#ef4444' }]} allowFontScaling={false}>
                               Delete
                             </Text>
@@ -1408,31 +1449,10 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
                           setStatementModalOpen(true);
                         }}
                       >
-                        <View style={styles.rowBetween}>
-                          <View style={{ flex: 1, marginRight: 8 }}>
+                        {/* Top Header Row: Date on Left, Badge on Right */}
+                        <View style={styles.cardHeaderRow}>
+                          <View style={styles.numTag}>
                             <Text style={styles.coaNum} allowFontScaling={false}>{item.date}</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <Text style={styles.recordLabel} allowFontScaling={false}>{item.tenantName}</Text>
-                              <View
-                                style={[
-                                  styles.healthBadge,
-                                  { backgroundColor: item.balance <= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)' },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.healthBadgeText,
-                                    { color: item.balance <= 0 ? '#10b981' : '#f59e0b' },
-                                  ]}
-                                  allowFontScaling={false}
-                                >
-                                  {item.balance <= 0 ? '98%' : 'Due'}
-                                </Text>
-                              </View>
-                            </View>
-                            <Text style={styles.recordSubText} allowFontScaling={false}>
-                              {item.propertyName} · Unit {item.unitNumber}
-                            </Text>
                           </View>
                           <View style={[styles.badge, { borderColor: badgeColor, backgroundColor: `${badgeColor}14` }]}>
                             <Text style={[styles.badgeText, { color: badgeColor }]} allowFontScaling={false}>
@@ -1441,20 +1461,48 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
                           </View>
                         </View>
 
-                        <Text style={styles.ledgerDesc} allowFontScaling={false}>{item.description}</Text>
+                        {/* Resident Info & Health Badge */}
+                        <View style={{ marginTop: 8, marginBottom: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.recordLabel} allowFontScaling={false}>{item.tenantName}</Text>
+                            <View
+                              style={[
+                                styles.healthBadge,
+                                { backgroundColor: item.balance <= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)' },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.healthBadgeText,
+                                  { color: item.balance <= 0 ? '#10b981' : '#f59e0b' },
+                                ]}
+                                allowFontScaling={false}
+                              >
+                                {item.balance <= 0 ? '98%' : 'Due'}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.recordSubText} allowFontScaling={false}>
+                            {item.propertyName} · Unit {item.unitNumber}
+                          </Text>
+                          {Boolean(item.description) && (
+                            <Text style={styles.ledgerDesc} allowFontScaling={false} numberOfLines={1}>
+                              {item.description}
+                            </Text>
+                          )}
+                        </View>
 
-                        <View style={styles.divider} />
-
-                        <View style={styles.ledgerGrid}>
+                        {/* Financial Ledger Metrics Grid */}
+                        <View style={styles.ledgerBox}>
                           <View style={styles.ledgerGridItem}>
                             <Text style={styles.ledgerGridLabel} allowFontScaling={false}>DEBIT (+)</Text>
-                            <Text style={[styles.ledgerGridVal, { color: '#ef4444' }]} allowFontScaling={false}>
+                            <Text style={[styles.ledgerGridVal, { color: item.debit ? '#ef4444' : colors.textSecondary }]} allowFontScaling={false}>
                               {item.debit ? `+$${Number(item.debit).toLocaleString()}` : '-'}
                             </Text>
                           </View>
                           <View style={styles.ledgerGridItem}>
                             <Text style={styles.ledgerGridLabel} allowFontScaling={false}>CREDIT (-)</Text>
-                            <Text style={[styles.ledgerGridVal, { color: '#10b981' }]} allowFontScaling={false}>
+                            <Text style={[styles.ledgerGridVal, { color: item.credit ? '#10b981' : colors.textSecondary }]} allowFontScaling={false}>
                               {item.credit ? `-$${Number(item.credit).toLocaleString()}` : '-'}
                             </Text>
                           </View>
@@ -1466,8 +1514,9 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
                           </View>
                         </View>
 
-                        <View style={[styles.rowBetween, { marginTop: 10, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.cardBorder }]}>
-                          <Text style={styles.tapToViewText} allowFontScaling={false}>Tap to view official statement</Text>
+                        {/* Statement link footer */}
+                        <View style={styles.statementLinkRow}>
+                          <Text style={styles.statementLinkText} allowFontScaling={false}>Tap to view official statement</Text>
                           <Ionicons name="arrow-forward-outline" size={14} color="#38bdf8" />
                         </View>
                       </TouchableOpacity>
@@ -2081,7 +2130,10 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle} allowFontScaling={false}>Tenant Ledger Statement</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="receipt-outline" size={20} color="#38bdf8" style={{ marginRight: 8 }} />
+                <Text style={styles.modalTitle} allowFontScaling={false}>Tenant Ledger Statement</Text>
+              </View>
               <TouchableOpacity onPress={() => setStatementModalOpen(false)}>
                 <Ionicons name="close-circle-outline" size={24} color="#94a3b8" />
               </TouchableOpacity>
@@ -2091,61 +2143,129 @@ export const ManagerRentPaymentsScreen = ({ initialTab = 'payments' }) => {
               const { txs, tenant, totalOutstanding } = getStatementData();
               return (
                 <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+                  {/* STATEMENT RECIPIENT & COMPANY HEADER */}
                   <View style={styles.stmtHeaderCard}>
-                    <View style={styles.rowBetween}>
-                      <View style={{ flex: 1.2 }}>
-                        <Text style={styles.stmtBadgeText} allowFontScaling={false}>OFFICIAL TENANT LEDGER STATEMENT</Text>
+                    <View style={styles.stmtHeaderTopRow}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={styles.stmtBadgeText} allowFontScaling={false}>OFFICIAL TENANT LEDGER</Text>
                         <Text style={styles.stmtCompanyName} allowFontScaling={false}>Property Management</Text>
-                        <Text style={styles.stmtCompanyAddress} allowFontScaling={false}>Corporate Office</Text>
+                        <Text style={styles.stmtCompanyAddress} allowFontScaling={false}>Corporate Office · Statement of Account</Text>
                       </View>
+                      <View style={styles.stmtAuditedBadge}>
+                        <Ionicons name="shield-checkmark" size={12} color="#10b981" style={{ marginRight: 4 }} />
+                        <Text style={styles.stmtAuditedText} allowFontScaling={false}>VERIFIED</Text>
+                      </View>
+                    </View>
 
-                      <View style={styles.stmtRecipientBox}>
-                        <Text style={styles.stmtRecipientLabel} allowFontScaling={false}>STATEMENT RECIPIENT</Text>
-                        <Text style={styles.stmtRecipientName} allowFontScaling={false}>{selectedStatementTenant.tenantName}</Text>
-                        <Text style={styles.stmtRecipientContact} allowFontScaling={false}>Phone: {tenant.phone || 'N/A'}</Text>
-                        <Text style={styles.stmtRecipientContact} allowFontScaling={false}>Email: {tenant.email || 'N/A'}</Text>
-                        <Text style={styles.stmtRecipientLocation} allowFontScaling={false}>
-                          {tenant.unit
-                            ? `${tenant.unit.property?.name || 'Unassigned'} - Unit ${tenant.unit.unitNumber || 'Unassigned'}`
-                            : selectedStatementTenant.propertyName}
-                        </Text>
+                    <View style={styles.stmtDivider} />
+
+                    <View style={styles.stmtRecipientSection}>
+                      <Text style={styles.stmtRecipientLabel} allowFontScaling={false}>STATEMENT RECIPIENT</Text>
+                      <Text style={styles.stmtRecipientName} allowFontScaling={false}>{selectedStatementTenant.tenantName}</Text>
+
+                      <View style={styles.stmtMetaContainer}>
+                        <View style={styles.stmtMetaRow}>
+                          <Ionicons name="location-outline" size={13} color="#38bdf8" style={{ marginRight: 6 }} />
+                          <Text style={styles.stmtMetaText} allowFontScaling={false}>
+                            {tenant.unit
+                              ? `${tenant.unit.property?.name || 'Unassigned'} · Unit ${tenant.unit.unitNumber || 'Unassigned'}`
+                              : selectedStatementTenant.propertyName}
+                          </Text>
+                        </View>
+
+                        {(tenant.email || tenant.phone) ? (
+                          <View style={styles.stmtMetaContactRow}>
+                            {tenant.phone ? (
+                              <View style={[styles.stmtMetaRow, { flex: 1, marginRight: 8 }]}>
+                                <Ionicons name="call-outline" size={13} color="#94a3b8" style={{ marginRight: 6 }} />
+                                <Text style={styles.stmtMetaText} allowFontScaling={false}>{tenant.phone}</Text>
+                              </View>
+                            ) : null}
+                            {tenant.email ? (
+                              <View style={[styles.stmtMetaRow, { flex: 1.2 }]}>
+                                <Ionicons name="mail-outline" size={13} color="#94a3b8" style={{ marginRight: 6 }} />
+                                <Text style={styles.stmtMetaText} numberOfLines={1} ellipsizeMode="middle" allowFontScaling={false}>{tenant.email}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        ) : null}
                       </View>
                     </View>
                   </View>
 
+                  {/* SCROLLABLE TABLE HINT */}
+                  <View style={styles.stmtScrollHintRow}>
+                    <Text style={styles.stmtScrollHintText} allowFontScaling={false}>
+                      TRANSACTION HISTORY ({txs.length})
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={styles.stmtSwipeHintText} allowFontScaling={false}>Swipe to view all</Text>
+                      <Ionicons name="arrow-forward" size={11} color="#64748b" style={{ marginLeft: 3 }} />
+                    </View>
+                  </View>
+
+                  {/* HORIZONTALLY SCROLLABLE TABLE */}
                   <View style={styles.stmtTableContainer}>
-                    <View style={styles.stmtTableHeaderRow}>
-                      <Text style={[styles.stmtTableHeaderCol, { flex: 1.2 }]} allowFontScaling={false}>DATE</Text>
-                      <Text style={[styles.stmtTableHeaderCol, { flex: 2 }]} allowFontScaling={false}>DESCRIPTION</Text>
-                      <Text style={[styles.stmtTableHeaderCol, { flex: 1.2, textAlign: 'right' }]} allowFontScaling={false}>DEBIT (+)</Text>
-                      <Text style={[styles.stmtTableHeaderCol, { flex: 1.2, textAlign: 'right' }]} allowFontScaling={false}>CREDIT (-)</Text>
-                      <Text style={[styles.stmtTableHeaderCol, { flex: 1.3, textAlign: 'right' }]} allowFontScaling={false}>RUNNING BAL</Text>
-                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={true} nestedScrollEnabled={true}>
+                      <View style={styles.stmtTableInner}>
+                        <View style={styles.stmtTableHeaderRow}>
+                          <Text style={[styles.stmtTableHeaderCol, styles.stmtColDate]} allowFontScaling={false}>DATE</Text>
+                          <Text style={[styles.stmtTableHeaderCol, styles.stmtColDesc]} allowFontScaling={false}>DESCRIPTION</Text>
+                          <Text style={[styles.stmtTableHeaderCol, styles.stmtColDebit]} allowFontScaling={false}>DEBIT (+)</Text>
+                          <Text style={[styles.stmtTableHeaderCol, styles.stmtColCredit]} allowFontScaling={false}>CREDIT (-)</Text>
+                          <Text style={[styles.stmtTableHeaderCol, styles.stmtColBal]} allowFontScaling={false}>RUNNING BAL</Text>
+                        </View>
 
-                    {txs.map((tx, idx) => (
-                      <View key={tx.id || idx} style={styles.stmtTableRow}>
-                        <Text style={[styles.stmtTableColText, { flex: 1.2 }]} allowFontScaling={false}>{tx.date}</Text>
-                        <Text style={[styles.stmtTableColText, { flex: 2, color: colors.textPrimary }]} allowFontScaling={false}>{tx.description}</Text>
-                        <Text style={[styles.stmtTableColText, { flex: 1.2, textAlign: 'right', color: tx.debit ? '#ef4444' : '#64748b' }]} allowFontScaling={false}>
-                          {tx.debit ? `$${tx.debit.toFixed(2)}` : '-'}
-                        </Text>
-                        <Text style={[styles.stmtTableColText, { flex: 1.2, textAlign: 'right', color: tx.credit ? '#10b981' : '#64748b' }]} allowFontScaling={false}>
-                          {tx.credit ? `$${tx.credit.toFixed(2)}` : '-'}
-                        </Text>
-                        <Text style={[styles.stmtTableColText, { flex: 1.3, textAlign: 'right', color: '#38bdf8', fontWeight: '800' }]} allowFontScaling={false}>
-                          ${tx.runningBalance.toFixed(2)}
-                        </Text>
+                        {txs.map((tx, idx) => (
+                          <View key={tx.id || idx} style={[styles.stmtTableRow, idx % 2 === 1 && styles.stmtTableRowAlt]}>
+                            <Text style={[styles.stmtTableColText, styles.stmtColDate]} allowFontScaling={false}>{tx.date}</Text>
+                            <Text style={[styles.stmtTableColText, styles.stmtColDesc, { color: colors.textPrimary }]} allowFontScaling={false} numberOfLines={2}>
+                              {tx.description}
+                            </Text>
+                            <Text style={[styles.stmtTableColText, styles.stmtColDebit, { color: tx.debit ? '#ef4444' : '#64748b' }]} allowFontScaling={false}>
+                              {tx.debit ? formatCurrency(tx.debit) : '—'}
+                            </Text>
+                            <Text style={[styles.stmtTableColText, styles.stmtColCredit, { color: tx.credit ? '#10b981' : '#64748b' }]} allowFontScaling={false}>
+                              {tx.credit ? formatCurrency(tx.credit) : '—'}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.stmtTableColText,
+                                styles.stmtColBal,
+                                {
+                                  color: tx.runningBalance > 0 ? '#ef4444' : tx.runningBalance < 0 ? '#38bdf8' : '#10b981',
+                                  fontWeight: '800',
+                                },
+                              ]}
+                              allowFontScaling={false}
+                            >
+                              {formatCurrency(tx.runningBalance)}
+                            </Text>
+                          </View>
+                        ))}
                       </View>
-                    ))}
+                    </ScrollView>
                   </View>
 
+                  {/* SUMMARY FOOTER */}
                   <View style={styles.stmtFooterRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.stmtGeneratedText} allowFontScaling={false}>System Audited Tenant Ledger</Text>
+                      <Text style={[styles.stmtGeneratedText, { fontSize: 8.5, marginTop: 2 }]} allowFontScaling={false}>
+                        Total Records: {txs.length}
+                      </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={styles.stmtOutstandingLabel} allowFontScaling={false}>OUTSTANDING BALANCE</Text>
-                      <Text style={styles.stmtOutstandingValue} allowFontScaling={false}>${totalOutstanding.toFixed(2)}</Text>
+                      <Text
+                        style={[
+                          styles.stmtOutstandingValue,
+                          { color: totalOutstanding > 0 ? '#ef4444' : '#10b981' }
+                        ]}
+                        allowFontScaling={false}
+                      >
+                        {formatCurrency(totalOutstanding)}
+                      </Text>
                     </View>
                   </View>
 
@@ -2203,11 +2323,26 @@ const getStyles = (colors, isDarkMode) =>
     },
 
     // Tab switcher
-    tabRow: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: 10, padding: 3, marginTop: 10 },
-    tabItem: { flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8 },
+    tabItem: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 8,
+      backgroundColor: colors.surface,
+      marginRight: 6,
+    },
     tabItemActive: { backgroundColor: '#38bdf8' },
-    tabItemText: { color: colors.textSecondary, fontSize: 12.5, fontWeight: '700' },
+    tabItemText: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
     tabItemTextActive: { color: '#0f172a', fontWeight: '800' },
+
+    // Filter divider
+    filterDivider: {
+      width: 1,
+      height: 20,
+      backgroundColor: colors.cardBorder,
+      marginHorizontal: 8,
+    },
 
     // Search bar
     searchBarRow: { flexDirection: 'row', alignItems: 'center' },
@@ -2350,15 +2485,29 @@ const getStyles = (colors, isDarkMode) =>
       borderWidth: 1,
       borderColor: colors.cardBorder,
     },
-    coaNum: { fontSize: 11, fontWeight: '800', color: '#38bdf8', letterSpacing: 0.5, marginBottom: 2 },
-    recordLabel: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
-    recordValue: { fontSize: 14.5, fontWeight: '900' },
-    recordSubText: { fontSize: 11.5, color: colors.textSecondary },
-    recordSubTextVal: { fontSize: 11.5, color: colors.textSecondary, fontWeight: '700' },
+    cardHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    numTag: {
+      backgroundColor: 'rgba(56, 189, 248, 0.1)',
+      paddingHorizontal: 7,
+      paddingVertical: 2.5,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: 'rgba(56, 189, 248, 0.25)',
+    },
+    coaNum: { fontSize: 11, fontWeight: '800', color: '#38bdf8', letterSpacing: 0.5 },
+    recordLabel: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
+    recordValue: { fontSize: 15, fontWeight: '900' },
+    recordSubText: { fontSize: 11.5, color: colors.textSecondary, marginTop: 2 },
+    recordSubTextVal: { fontSize: 12, color: colors.textPrimary, fontWeight: '700' },
+    detailLabelText: { fontSize: 11.5, color: colors.textSecondary },
     divider: { height: 1, backgroundColor: colors.divider, marginVertical: 8 },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     badgesRow: { flexDirection: 'row', alignItems: 'center' },
-    badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+    badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2.5 },
     badgeText: { fontSize: 9.5, fontWeight: '800', textTransform: 'uppercase' },
 
     // Health badge
@@ -2382,23 +2531,41 @@ const getStyles = (colors, isDarkMode) =>
     cardActionBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingHorizontal: 11,
+      paddingVertical: 6,
       borderRadius: 7,
       borderWidth: 1,
       borderColor: 'rgba(56, 189, 248, 0.3)',
       backgroundColor: 'rgba(56, 189, 248, 0.06)',
       marginLeft: 8,
     },
-    cardActionBtnText: { fontSize: 11, fontWeight: '800' },
+    cardActionBtnText: { fontSize: 11.5, fontWeight: '800' },
 
     // Ledger specific
-    ledgerDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
-    ledgerGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+    ledgerDesc: { fontSize: 11.5, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' },
+    ledgerBox: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+      borderRadius: 10,
+      padding: 10,
+      marginTop: 4,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
     ledgerGridItem: { flex: 1, alignItems: 'flex-start' },
     ledgerGridLabel: { fontSize: 8.5, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
-    ledgerGridVal: { fontSize: 12, fontWeight: '800', marginTop: 2 },
-    tapToViewText: { fontSize: 10.5, color: '#38bdf8', fontWeight: '700' },
+    ledgerGridVal: { fontSize: 12.5, fontWeight: '800', marginTop: 2 },
+    statementLinkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 10,
+      paddingTop: 6,
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+    },
+    statementLinkText: { fontSize: 11.5, fontWeight: '700', color: '#38bdf8' },
 
     // Pagination
     paginationRow: {
@@ -2582,19 +2749,65 @@ const getStyles = (colors, isDarkMode) =>
     stmtHeaderCard: {
       backgroundColor: colors.inputBackground,
       borderRadius: 12,
-      padding: 12,
+      padding: 14,
       borderWidth: 1,
       borderColor: colors.cardBorder,
-      marginBottom: 14,
+      marginBottom: 12,
     },
-    stmtBadgeText: { fontSize: 8.5, fontWeight: '900', color: '#38bdf8', letterSpacing: 0.8, marginBottom: 4 },
-    stmtCompanyName: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
-    stmtCompanyAddress: { fontSize: 10.5, color: colors.textSecondary },
-    stmtRecipientBox: { alignItems: 'flex-end', flex: 1, marginLeft: 8 },
-    stmtRecipientLabel: { fontSize: 8, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5, marginBottom: 2 },
-    stmtRecipientName: { fontSize: 12.5, fontWeight: '800', color: colors.textPrimary },
-    stmtRecipientContact: { fontSize: 10, color: colors.textSecondary },
-    stmtRecipientLocation: { fontSize: 10, color: colors.textSecondary, fontWeight: 'bold', marginTop: 2 },
+    stmtHeaderTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+    },
+    stmtBadgeText: { fontSize: 8.5, fontWeight: '900', color: '#38bdf8', letterSpacing: 0.8, marginBottom: 3 },
+    stmtCompanyName: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
+    stmtCompanyAddress: { fontSize: 10.5, color: colors.textSecondary, marginTop: 1 },
+    stmtAuditedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+    },
+    stmtAuditedText: { fontSize: 9, fontWeight: '800', color: '#10b981', letterSpacing: 0.5 },
+    stmtDivider: {
+      height: 1,
+      backgroundColor: colors.cardBorder,
+      marginVertical: 12,
+    },
+    stmtRecipientSection: {
+      marginTop: 2,
+    },
+    stmtRecipientLabel: { fontSize: 8.5, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.6, marginBottom: 3 },
+    stmtRecipientName: { fontSize: 14, fontWeight: '800', color: colors.textPrimary, marginBottom: 6 },
+    stmtMetaContainer: {
+      marginTop: 2,
+    },
+    stmtMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 2,
+    },
+    stmtMetaContactRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    stmtMetaText: { fontSize: 11, color: colors.textSecondary },
+
+    stmtScrollHintRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+      paddingHorizontal: 2,
+    },
+    stmtScrollHintText: { fontSize: 9.5, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.6 },
+    stmtSwipeHintText: { fontSize: 9.5, color: '#64748b' },
+
     stmtTableContainer: {
       backgroundColor: colors.inputBackground,
       borderRadius: 12,
@@ -2603,38 +2816,52 @@ const getStyles = (colors, isDarkMode) =>
       overflow: 'hidden',
       marginBottom: 14,
     },
+    stmtTableInner: {
+      minWidth: 575,
+    },
     stmtTableHeaderRow: {
       flexDirection: 'row',
       backgroundColor: colors.surface,
-      paddingVertical: 8,
-      paddingHorizontal: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
       borderBottomWidth: 1,
       borderBottomColor: colors.cardBorder,
+      alignItems: 'center',
     },
-    stmtTableHeaderCol: { fontSize: 8.5, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.5 },
+    stmtTableHeaderCol: { fontSize: 9, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.5 },
     stmtTableRow: {
       flexDirection: 'row',
-      paddingVertical: 8,
-      paddingHorizontal: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
       borderBottomWidth: 1,
       borderBottomColor: colors.surface,
       alignItems: 'center',
     },
-    stmtTableColText: { fontSize: 10, color: colors.textSecondary },
+    stmtTableRowAlt: {
+      backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    },
+    stmtTableColText: { fontSize: 11, color: colors.textSecondary },
+
+    stmtColDate: { width: 95 },
+    stmtColDesc: { width: 190 },
+    stmtColDebit: { width: 85, textAlign: 'right' },
+    stmtColCredit: { width: 85, textAlign: 'right' },
+    stmtColBal: { width: 105, textAlign: 'right' },
+
     stmtFooterRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       backgroundColor: colors.inputBackground,
       borderRadius: 12,
-      padding: 10,
+      padding: 12,
       borderWidth: 1,
       borderColor: colors.cardBorder,
       marginBottom: 12,
     },
-    stmtGeneratedText: { fontSize: 9.5, color: colors.textMuted },
-    stmtOutstandingLabel: { fontSize: 8, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.5 },
-    stmtOutstandingValue: { fontSize: 15, fontWeight: '900', color: '#10b981', marginTop: 2 },
+    stmtGeneratedText: { fontSize: 10, color: colors.textMuted },
+    stmtOutstandingLabel: { fontSize: 8.5, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.5 },
+    stmtOutstandingValue: { fontSize: 16, fontWeight: '900', marginTop: 2 },
 
     // Inline dropdown cards
     inlineDropdownCard: {

@@ -33,15 +33,21 @@ export const OwnerDashboard = ({ onNavigate }) => {
   });
   const [properties, setProperties] = useState([]);
   const [chartData, setChartData] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Fetch live owner data strictly from backend matching Manager Dashboard patterns
   const fetchLiveOwnerData = async () => {
     try {
-      const [metricsRes, propsRes, chartsRes] = await Promise.all([
+      const [metricsRes, propsRes, chartsRes, notifsRes] = await Promise.all([
         apiClient.get('/portal/owner/metrics', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/properties', logout, refreshAccessToken).catch(() => null),
         apiClient.get('/dashboard/charts', logout, refreshAccessToken).catch(() => null),
+        apiClient.get('/notifications?role=Owner', logout, refreshAccessToken).catch(() => null),
       ]);
+
+      const rawNotifs = Array.isArray(notifsRes) ? notifsRes : (notifsRes?.data || []);
+      const notifArray = Array.isArray(rawNotifs) ? rawNotifs : [];
+      setUnreadCount(notifArray.filter((n) => !n.read && !n.isRead).length);
 
       let pList = [];
       if (propsRes && Array.isArray(propsRes)) {
@@ -201,7 +207,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
           1. CLEAN TOP HEADER WITH WELCOME & LIVE SYNC (Manager Dashboard Style)
           ========================================================================= */}
       <View style={styles.headerRow}>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, paddingRight: 8 }}>
           <Text style={[styles.headerGreeting, { color: colors.textSecondary }]} allowFontScaling={false}>
             Welcome back, {ownerName} 👋
           </Text>
@@ -210,21 +216,45 @@ export const OwnerDashboard = ({ onNavigate }) => {
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.syncBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
-          onPress={handleRefresh}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name="refresh-outline"
-            size={16}
-            color="#2563eb"
-            style={{ marginRight: 4 }}
-          />
-          <Text style={styles.syncBtnText} allowFontScaling={false}>
-            Sync
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.syncBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+            onPress={handleRefresh}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="refresh-outline"
+              size={15}
+              color="#2563eb"
+              style={{ marginRight: 4 }}
+            />
+            <Text style={styles.syncBtnText} allowFontScaling={false}>
+              Sync
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.bellBtn,
+              {
+                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                borderColor: colors.cardBorder,
+              },
+            ]}
+            onPress={() => onNavigate && onNavigate('notifications')}
+            activeOpacity={0.7}
+            accessibilityLabel="Notifications"
+          >
+            <Ionicons name="notifications-outline" size={20} color={colors.textPrimary} />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* =========================================================================
@@ -591,6 +621,34 @@ const getStyles = (colors, isDarkMode, width = 390) => {
       fontSize: 12,
       fontWeight: '700',
       color: '#2563eb',
+    },
+    bellBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+      borderWidth: 1,
+    },
+    bellBadge: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+      backgroundColor: '#ef4444',
+      borderRadius: 9,
+      minWidth: 16,
+      height: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+      borderWidth: 1.5,
+      borderColor: colors.background,
+    },
+    bellBadgeText: {
+      color: '#ffffff',
+      fontSize: 8.5,
+      fontWeight: '900',
     },
 
     // Shortcuts Row

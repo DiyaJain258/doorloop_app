@@ -151,7 +151,7 @@ export const NavigationDrawer = ({ visible, onClose, activeScreen, activeTab, on
         { id: 'maint-req', title: language === 'es' ? 'Solicitudes Servicio' : language === 'hi' ? 'सेवा अनुरोध' : 'Service Requests', path: '/maintenance/requests', screen: 'maintenance', tab: 'requests' },
         { id: 'maint-wo', title: language === 'es' ? 'Órdenes de Trabajo' : language === 'hi' ? 'कार्य आदेश' : 'Work Orders', path: '/maintenance/work-orders', screen: 'maintenance', tab: 'work_orders' },
         { id: 'maint-viol', title: language === 'es' ? 'Infracciones y Código' : language === 'hi' ? 'उल्लंघन एवं कोड' : 'Violations & Code', path: '/maintenance/violations', screen: 'maintenance', tab: 'violations' },
-        { id: 'maint-vend', title: language === 'es' ? 'Proveedores' : language === 'hi' ? 'विक्रेता (Vendors)' : 'Vendors', path: '/vendors', screen: 'maintenance', tab: 'vendors' },
+        { id: 'maint-vend', title: language === 'es' ? 'Personal de Mantenimiento' : language === 'hi' ? 'रखरखाव कर्मचारी (Staff)' : 'Maintenance Staff', path: '/vendors', screen: 'maintenance', tab: 'staff' },
       ],
     },
     {
