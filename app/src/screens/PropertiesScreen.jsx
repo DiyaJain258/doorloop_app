@@ -33,11 +33,18 @@ const PROPERTY_TYPES = [
   'Other',
 ];
 const PROPERTY_STATUSES = ['Active', 'Inactive', 'Under Review', 'Draft'];
-const PAYMENT_PROVIDERS = [
-  'Use Company Default (Fallback Option)',
-  'Stripe Connect Account',
-  'Authorize.Net Gateway',
-  'Direct Merchant Account',
+const PAYMENT_ACCOUNT_SETUPS = [
+  { label: '🏢 Use Company Default (Company Settings)', value: 'COMPANY_DEFAULT' },
+  { label: '⚙️ Other (Custom Payment Gateway)', value: 'OTHER' },
+];
+const CUSTOM_GATEWAY_PROVIDERS = [
+  { label: '💳 Stripe (Credit/Debit/Apple Pay)', value: 'STRIPE' },
+  { label: '⚡ Razorpay (Cards, UPI & NetBanking)', value: 'RAZORPAY' },
+  { label: '🔒 Authorize.Net (Credit Card & eCheck)', value: 'AUTHORIZE_NET' },
+];
+const GATEWAY_STATUSES = [
+  { label: 'Active (Accepting Tenant Payments)', value: 'Active' },
+  { label: 'Inactive (Temporarily Disabled)', value: 'Inactive' },
 ];
 const UNIT_STATUSES = ['Occupied', 'Vacant', 'Reserved', 'Under Maintenance'];
 const GENDERS = ['Male', 'Female', 'Other'];
@@ -170,33 +177,42 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const [submitting, setSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
-  // Property Form Inputs (Matching Web 1:1)
+  // Property Form Inputs (Matching Web 1:1 - Blank by default)
   const [pName, setPName] = useState('');
   const [pType, setPType] = useState('Apartment');
   const [pStatus, setPStatus] = useState('Active');
   const [pStreet, setPStreet] = useState('');
-  const [pCity, setPCity] = useState('Austin');
-  const [pState, setPState] = useState('TX');
+  const [pCity, setPCity] = useState('');
+  const [pState, setPState] = useState('');
   const [pCountry, setPCountry] = useState('USA');
-  const [pZip, setPZip] = useState('78701');
+  const [pZip, setPZip] = useState('');
   const [pNycBin, setPNycBin] = useState('');
   const [pFloors, setPFloors] = useState('1');
   const [pUnitsCount, setPUnitsCount] = useState('1');
   const [pOwnerId, setPOwnerId] = useState('');
   const [pShare, setPShare] = useState('100');
   const [pManagementCompany, setPManagementCompany] = useState('');
-  const [pPaymentProvider, setPPaymentProvider] = useState('Use Company Default (Fallback Option)');
+
+  // Payment Integration & Merchant Account (Matching Web 1:1)
+  const [pPaymentAccountSetup, setPPaymentAccountSetup] = useState('COMPANY_DEFAULT'); // 'COMPANY_DEFAULT' | 'OTHER'
+  const [pCustomGateway, setPCustomGateway] = useState('RAZORPAY'); // 'STRIPE' | 'RAZORPAY' | 'AUTHORIZE_NET'
+  const [pPaymentStatus, setPPaymentStatus] = useState('Active'); // 'Active' | 'Inactive'
+  const [pPaymentAccountId, setPPaymentAccountId] = useState('');
+  const [pPaymentAuthToken, setPPaymentAuthToken] = useState('');
+  const [showPaymentSecret, setShowPaymentSecret] = useState(false);
+
+  // Additional Details (Optional - blank by default)
   const [showPropAdditional, setShowPropAdditional] = useState(false);
-  const [pYearBuilt, setPYearBuilt] = useState('2020');
-  const [pSqft, setPSqft] = useState('8500');
-  const [pPurchasePrice, setPPurchasePrice] = useState('1800000');
-  const [pCurrentValue, setPCurrentValue] = useState('2200000');
-  const [pExpenses, setPExpenses] = useState('4500');
+  const [pYearBuilt, setPYearBuilt] = useState('');
+  const [pSqft, setPSqft] = useState('');
+  const [pPurchasePrice, setPPurchasePrice] = useState('');
+  const [pCurrentValue, setPCurrentValue] = useState('');
+  const [pExpenses, setPExpenses] = useState('');
   const [pPhotoUrl, setPPhotoUrl] = useState('');
   const [pNotes, setPNotes] = useState('');
 
   // Dropdown Picker Modal state for Property Form
-  const [activePropDropdown, setActivePropDropdown] = useState(null); // 'type' | 'status' | 'owner' | 'paymentProvider' | null
+  const [activePropDropdown, setActivePropDropdown] = useState(null); // 'type' | 'status' | 'owner' | 'paymentAccountSetup' | 'customGateway' | 'gatewayStatus' | null
 
   // Quick Add Owner Modal inside Property Form
   const [isQuickAddOwnerOpen, setIsQuickAddOwnerOpen] = useState(false);
@@ -422,23 +438,28 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
     setPType('Apartment');
     setPStatus('Active');
     setPStreet('');
-    setPCity('Austin');
-    setPState('TX');
+    setPCity('');
+    setPState('');
     setPCountry('USA');
-    setPZip('78701');
+    setPZip('');
     setPNycBin('');
-    setPOwnerId(owners[0]?.id || '');
+    setPOwnerId('');
     setPShare('100');
-    setPManagementCompany(user?.companyName || 'Divine Properties');
+    setPManagementCompany('');
     setPFloors('1');
     setPUnitsCount('1');
-    setPPaymentProvider('Use Company Default (Fallback Option)');
+    setPPaymentAccountSetup('COMPANY_DEFAULT');
+    setPCustomGateway('RAZORPAY');
+    setPPaymentStatus('Active');
+    setPPaymentAccountId('');
+    setPPaymentAuthToken('');
+    setShowPaymentSecret(false);
     setShowPropAdditional(false);
-    setPYearBuilt('2020');
-    setPSqft('8500');
-    setPPurchasePrice('1800000');
-    setPCurrentValue('2200000');
-    setPExpenses('4500');
+    setPYearBuilt('');
+    setPSqft('');
+    setPPurchasePrice('');
+    setPCurrentValue('');
+    setPExpenses('');
     setPPhotoUrl('');
     setPNotes('');
     setFormErrors({});
@@ -451,23 +472,31 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
     setPType(prop.type || 'Apartment');
     setPStatus(prop.status || 'Active');
     setPStreet(prop.streetAddress || prop.address || '');
-    setPCity(prop.city || 'Austin');
-    setPState(prop.state || 'TX');
+    setPCity(prop.city || '');
+    setPState(prop.state || '');
     setPCountry(prop.country || 'USA');
-    setPZip(prop.zip || '78701');
+    setPZip(prop.zip || '');
     setPNycBin(prop.nycBin || prop.bin || '');
-    setPOwnerId(prop.ownerId || (typeof prop.owner === 'object' ? prop.owner?.id : prop.owner) || owners[0]?.id || '');
+    setPOwnerId(prop.ownerId || (typeof prop.owner === 'object' ? prop.owner?.id : prop.owner) || '');
     setPShare(String(prop.ownershipPercentage ?? 100));
-    setPManagementCompany(prop.managementCompany || user?.companyName || 'Divine Properties');
+    setPManagementCompany(prop.managementCompany || '');
     setPFloors(String(prop.totalFloors || prop.floors || 1));
     setPUnitsCount(String(prop.totalUnits || prop.unitsCount || 1));
-    setPPaymentProvider(prop.paymentProvider || 'Use Company Default (Fallback Option)');
+
+    const isCompanyDefault = !prop.paymentProvider || prop.paymentProvider === 'COMPANY_DEFAULT';
+    setPPaymentAccountSetup(isCompanyDefault ? 'COMPANY_DEFAULT' : 'OTHER');
+    setPCustomGateway(isCompanyDefault ? 'RAZORPAY' : (prop.paymentProvider || 'RAZORPAY'));
+    setPPaymentStatus(prop.paymentStatus || 'Active');
+    setPPaymentAccountId(prop.paymentAccountId || '');
+    setPPaymentAuthToken('');
+    setShowPaymentSecret(false);
+
     setShowPropAdditional(false);
-    setPYearBuilt(String(prop.yearBuilt || 2020));
-    setPSqft(String(prop.squareFootage || 8500));
-    setPPurchasePrice(prop.purchasePrice ? String(prop.purchasePrice) : '1800000');
-    setPCurrentValue(String(prop.currentValue || 2200000));
-    setPExpenses(String(prop.monthlyExpenses || 4500));
+    setPYearBuilt(prop.yearBuilt ? String(prop.yearBuilt) : '');
+    setPSqft(prop.squareFootage ? String(prop.squareFootage) : '');
+    setPPurchasePrice(prop.purchasePrice ? String(prop.purchasePrice) : '');
+    setPCurrentValue(prop.currentValue ? String(prop.currentValue) : '');
+    setPExpenses(prop.monthlyExpenses ? String(prop.monthlyExpenses) : '');
     setPPhotoUrl(prop.photoUrl || prop.photo || '');
     setPNotes(prop.notes || prop.description || '');
     setFormErrors({});
@@ -522,6 +551,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
   const handleSaveProperty = async (saveAsDraft = false) => {
     setFormErrors({});
     const targetStatus = saveAsDraft ? 'Draft' : pStatus;
+    const finalPaymentProvider = pPaymentAccountSetup === 'COMPANY_DEFAULT' ? 'COMPANY_DEFAULT' : pCustomGateway;
     const payload = {
       name: pName.trim(),
       type: pType,
@@ -532,19 +562,26 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
       country: pCountry.trim() || 'USA',
       zip: pZip.trim() || undefined,
       nycBin: pNycBin.trim() || undefined,
-      address: pStreet.trim() ? `${pStreet.trim()}, ${pCity.trim()}, ${pState.trim()}` : `${pCity}, ${pState}`,
-      ownerId: pOwnerId || (owners[0]?.id || undefined),
-      ownershipPercentage: Number(pShare) || 100,
-      managementCompany: pManagementCompany.trim() || user?.companyName || 'Divine Properties',
-      yearBuilt: Number(pYearBuilt) || 2020,
-      totalFloors: Number(pFloors) || 1,
-      totalBuildings: 1,
-      totalUnits: Number(pUnitsCount) || 1,
-      squareFootage: Number(pSqft) || 8500,
-      purchasePrice: pPurchasePrice ? Number(pPurchasePrice) : undefined,
-      currentValue: Number(pCurrentValue) || 2200000,
-      monthlyExpenses: Number(pExpenses) || 4500,
-      paymentProvider: pPaymentProvider,
+      address: pStreet.trim()
+        ? `${pStreet.trim()}, ${pCity.trim()}, ${pState.trim()}`
+        : pCity.trim()
+        ? `${pCity.trim()}, ${pState.trim()}`
+        : undefined,
+      ownerId: pOwnerId.trim() || undefined,
+      ownershipPercentage: pShare.trim() ? Number(pShare) : 100,
+      managementCompany: pManagementCompany.trim() || undefined,
+      yearBuilt: pYearBuilt.trim() ? Number(pYearBuilt) : undefined,
+      totalFloors: pFloors.trim() ? Number(pFloors) : 1,
+      totalBuildings: pFloors.trim() ? Number(pFloors) : 1,
+      totalUnits: pUnitsCount.trim() ? Number(pUnitsCount) : 1,
+      squareFootage: pSqft.trim() ? Number(pSqft) : undefined,
+      purchasePrice: pPurchasePrice.trim() ? Number(pPurchasePrice) : undefined,
+      currentValue: pCurrentValue.trim() ? Number(pCurrentValue) : undefined,
+      monthlyExpenses: pExpenses.trim() ? Number(pExpenses) : undefined,
+      paymentProvider: finalPaymentProvider,
+      paymentAccountId: pPaymentAccountSetup === 'COMPANY_DEFAULT' ? undefined : (pPaymentAccountId.trim() || undefined),
+      paymentAuthToken: pPaymentAccountSetup === 'COMPANY_DEFAULT' ? undefined : (pPaymentAuthToken.trim() || undefined),
+      paymentStatus: pPaymentAccountSetup === 'COMPANY_DEFAULT' ? 'Active' : pPaymentStatus,
       photoUrl: pPhotoUrl.trim() || undefined,
       notes: pNotes.trim() || undefined,
     };
@@ -1800,13 +1837,31 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 6 }}>
                       <Ionicons name="card" size={15} color="#2563eb" />
                       <Text style={styles.propPaymentTitle} allowFontScaling={false} numberOfLines={1}>
-                        PAYMENT INTEGRATION
+                        PAYMENT INTEGRATION & MERCHANT ACCOUNT
                       </Text>
                     </View>
-                    <View style={styles.companyDefaultBadge}>
-                      <Ionicons name="shield-checkmark" size={11} color="#059669" />
-                      <Text style={styles.companyDefaultBadgeText} allowFontScaling={false}>
-                        Company Default
+                    <View
+                      style={[
+                        styles.companyDefaultBadge,
+                        pPaymentAccountSetup !== 'COMPANY_DEFAULT' && styles.customGatewayBadge,
+                      ]}
+                    >
+                      <Ionicons
+                        name="shield-checkmark"
+                        size={11}
+                        color={pPaymentAccountSetup === 'COMPANY_DEFAULT' ? colors.textMuted : '#059669'}
+                      />
+                      <Text
+                        style={[
+                          styles.companyDefaultBadgeText,
+                          pPaymentAccountSetup !== 'COMPANY_DEFAULT' && { color: '#059669' },
+                          pPaymentAccountSetup === 'COMPANY_DEFAULT' && { color: colors.textSecondary },
+                        ]}
+                        allowFontScaling={false}
+                      >
+                        {pPaymentAccountSetup === 'COMPANY_DEFAULT'
+                          ? 'Company Default (Option 1)'
+                          : `Custom Gateway: ${pCustomGateway}`}
                       </Text>
                     </View>
                   </View>
@@ -1814,27 +1869,259 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                     Configure property-specific payment gateway to receive tenant rent in this account, or use Company Default as fallback.
                   </Text>
 
+                  {/* PAYMENT ACCOUNT SETUP */}
                   <View style={{ marginTop: 10 }}>
                     <Text style={styles.propPaymentLabel} allowFontScaling={false}>
-                      PAYMENT PROVIDER / ACCOUNT DESTINATION
+                      PAYMENT ACCOUNT SETUP
                     </Text>
                     <TouchableOpacity
                       style={styles.propPaymentDropdown}
-                      onPress={() => setActivePropDropdown('paymentProvider')}
+                      onPress={() => setActivePropDropdown('paymentAccountSetup')}
                       activeOpacity={0.7}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                        <Ionicons name="business-outline" size={15} color={colors.textSecondary} />
+                        <Ionicons
+                          name={pPaymentAccountSetup === 'COMPANY_DEFAULT' ? 'business-outline' : 'settings-outline'}
+                          size={15}
+                          color={colors.textSecondary}
+                        />
                         <Text style={styles.propPaymentDropdownVal} numberOfLines={1} allowFontScaling={false}>
-                          {pPaymentProvider}
+                          {pPaymentAccountSetup === 'COMPANY_DEFAULT'
+                            ? '🏢 Use Company Default (Company Settings)'
+                            : '⚙️ Other (Custom Payment Gateway)'}
                         </Text>
                       </View>
                       <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                     <Text style={styles.propPaymentHint} allowFontScaling={false}>
-                      Tenant rent for this property will flow through the global gateway configured under Company Settings.
+                      {pPaymentAccountSetup === 'COMPANY_DEFAULT'
+                        ? 'Tenant rent for this property will flow through the global gateway configured under Company Settings.'
+                        : 'Configure property-specific custom payment gateway credentials.'}
                     </Text>
                   </View>
+
+                  {/* CONDITIONAL EXTRA INPUTS WHEN 'OTHER' IS SELECTED (Matching Web 1:1) */}
+                  {pPaymentAccountSetup !== 'COMPANY_DEFAULT' && (
+                    <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
+                      
+                      {/* SELECT CUSTOM GATEWAY PROVIDER */}
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.propPaymentLabel} allowFontScaling={false}>
+                          SELECT CUSTOM GATEWAY PROVIDER
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.propPaymentDropdown}
+                          onPress={() => setActivePropDropdown('customGateway')}
+                          activeOpacity={0.7}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <Ionicons
+                              name={
+                                pCustomGateway === 'STRIPE'
+                                  ? 'card-outline'
+                                  : pCustomGateway === 'RAZORPAY'
+                                  ? 'flash-outline'
+                                  : 'lock-closed-outline'
+                              }
+                              size={15}
+                              color={colors.textSecondary}
+                            />
+                            <Text style={styles.propPaymentDropdownVal} numberOfLines={1} allowFontScaling={false}>
+                              {pCustomGateway === 'STRIPE'
+                                ? '💳 Stripe (Credit/Debit/Apple Pay)'
+                                : pCustomGateway === 'RAZORPAY'
+                                ? '⚡ Razorpay (Cards, UPI & NetBanking)'
+                                : '🔒 Authorize.Net (Credit Card & eCheck)'}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                        </TouchableOpacity>
+                        <Text style={styles.propPaymentHint} allowFontScaling={false}>
+                          Tenant rent will bypass Company Settings and deposit directly into this gateway.
+                        </Text>
+                      </View>
+
+                      {/* GATEWAY STATUS */}
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.propPaymentLabel} allowFontScaling={false}>
+                          GATEWAY STATUS
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.propPaymentDropdown}
+                          onPress={() => setActivePropDropdown('gatewayStatus')}
+                          activeOpacity={0.7}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <Ionicons
+                              name={pPaymentStatus === 'Active' ? 'checkmark-circle-outline' : 'pause-circle-outline'}
+                              size={15}
+                              color={pPaymentStatus === 'Active' ? '#10b981' : '#f59e0b'}
+                            />
+                            <Text style={styles.propPaymentDropdownVal} numberOfLines={1} allowFontScaling={false}>
+                              {pPaymentStatus === 'Active'
+                                ? 'Active (Accepting Tenant Payments)'
+                                : 'Inactive (Temporarily Disabled)'}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                        </TouchableOpacity>
+                        <Text style={styles.propPaymentHint} allowFontScaling={false}>
+                          Inactive status temporarily routes payments to Company Default until re-activated.
+                        </Text>
+                      </View>
+
+                      {/* CREDENTIALS - STRIPE */}
+                      {pCustomGateway === 'STRIPE' && (
+                        <View style={{ marginTop: 2 }}>
+                          <View style={{ marginBottom: 10 }}>
+                            <Text style={styles.propPaymentLabel} allowFontScaling={false}>
+                              STRIPE PUBLISHABLE KEY
+                            </Text>
+                            <TextInput
+                              style={[styles.propInput, { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 12.5 }]}
+                              placeholder="pk_live_... or pk_test_..."
+                              placeholderTextColor={colors.placeholder}
+                              value={pPaymentAccountId}
+                              onChangeText={setPPaymentAccountId}
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              allowFontScaling={false}
+                            />
+                          </View>
+                          <View>
+                            <Text style={styles.propPaymentLabel} allowFontScaling={false}>
+                              STRIPE SECRET KEY (ENCRYPTED IN DB)
+                            </Text>
+                            <View style={styles.passwordInputContainer}>
+                              <TextInput
+                                style={[styles.passwordInput, { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 12.5 }]}
+                                placeholder="sk_live_... or sk_test_..."
+                                placeholderTextColor={colors.placeholder}
+                                value={pPaymentAuthToken}
+                                onChangeText={setPPaymentAuthToken}
+                                secureTextEntry={!showPaymentSecret}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                allowFontScaling={false}
+                              />
+                              <TouchableOpacity
+                                onPress={() => setShowPaymentSecret(!showPaymentSecret)}
+                                style={styles.eyeBtn}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons
+                                  name={showPaymentSecret ? 'eye-off-outline' : 'eye-outline'}
+                                  size={16}
+                                  color={colors.textMuted}
+                                />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* CREDENTIALS - RAZORPAY (Exact match to Web Screenshot 2) */}
+                      {pCustomGateway === 'RAZORPAY' && (
+                        <View style={{ marginTop: 2 }}>
+                          <View style={{ marginBottom: 10 }}>
+                            <Text style={styles.propPaymentLabel} allowFontScaling={false}>
+                              RAZORPAY KEY ID
+                            </Text>
+                            <TextInput
+                              style={[styles.propInput, { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 12.5 }]}
+                              placeholder="rzp_live_... or rzp_test_..."
+                              placeholderTextColor={colors.placeholder}
+                              value={pPaymentAccountId}
+                              onChangeText={setPPaymentAccountId}
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              allowFontScaling={false}
+                            />
+                          </View>
+                          <View>
+                            <Text style={styles.propPaymentLabel} allowFontScaling={false}>
+                              RAZORPAY KEY SECRET (ENCRYPTED IN DB)
+                            </Text>
+                            <View style={styles.passwordInputContainer}>
+                              <TextInput
+                                style={[styles.passwordInput, { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 12.5 }]}
+                                placeholder="Enter Razorpay Key Secret"
+                                placeholderTextColor={colors.placeholder}
+                                value={pPaymentAuthToken}
+                                onChangeText={setPPaymentAuthToken}
+                                secureTextEntry={!showPaymentSecret}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                allowFontScaling={false}
+                              />
+                              <TouchableOpacity
+                                onPress={() => setShowPaymentSecret(!showPaymentSecret)}
+                                style={styles.eyeBtn}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons
+                                  name={showPaymentSecret ? 'eye-off-outline' : 'eye-outline'}
+                                  size={16}
+                                  color={colors.textMuted}
+                                />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* CREDENTIALS - AUTHORIZE_NET */}
+                      {pCustomGateway === 'AUTHORIZE_NET' && (
+                        <View style={{ marginTop: 2 }}>
+                          <View style={{ marginBottom: 10 }}>
+                            <Text style={styles.propPaymentLabel} allowFontScaling={false}>
+                              API LOGIN ID
+                            </Text>
+                            <TextInput
+                              style={[styles.propInput, { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 12.5 }]}
+                              placeholder="e.g. 2Aja8R5p"
+                              placeholderTextColor={colors.placeholder}
+                              value={pPaymentAccountId}
+                              onChangeText={setPPaymentAccountId}
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              allowFontScaling={false}
+                            />
+                          </View>
+                          <View>
+                            <Text style={styles.propPaymentLabel} allowFontScaling={false}>
+                              TRANSACTION KEY (ENCRYPTED IN DB)
+                            </Text>
+                            <View style={styles.passwordInputContainer}>
+                              <TextInput
+                                style={[styles.passwordInput, { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 12.5 }]}
+                                placeholder="Enter 16-character Transaction Key"
+                                placeholderTextColor={colors.placeholder}
+                                value={pPaymentAuthToken}
+                                onChangeText={setPPaymentAuthToken}
+                                secureTextEntry={!showPaymentSecret}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                allowFontScaling={false}
+                              />
+                              <TouchableOpacity
+                                onPress={() => setShowPaymentSecret(!showPaymentSecret)}
+                                style={styles.eyeBtn}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons
+                                  name={showPaymentSecret ? 'eye-off-outline' : 'eye-outline'}
+                                  size={16}
+                                  color={colors.textMuted}
+                                />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      )}
+
+                    </View>
+                  )}
                 </View>
 
                 {/* ADDITIONAL DETAILS (OPTIONAL) ACCORDION */}
@@ -1873,7 +2160,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                           <TextInput
                             style={styles.propInput}
                             keyboardType="numeric"
-                            placeholder="1800000"
+                            placeholder="e.g. 2000000"
                             placeholderTextColor={colors.placeholder}
                             value={pPurchasePrice}
                             onChangeText={setPPurchasePrice}
@@ -1885,7 +2172,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                           <TextInput
                             style={styles.propInput}
                             keyboardType="numeric"
-                            placeholder="2200000"
+                            placeholder="e.g. 2200000"
                             placeholderTextColor={colors.placeholder}
                             value={pCurrentValue}
                             onChangeText={setPCurrentValue}
@@ -1900,7 +2187,7 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                         <TextInput
                           style={styles.propInput}
                           keyboardType="numeric"
-                          placeholder="4500"
+                          placeholder="e.g. 4500"
                           placeholderTextColor={colors.placeholder}
                           value={pExpenses}
                           onChangeText={setPExpenses}
@@ -2027,7 +2314,13 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                           ? 'Select Status'
                           : activePropDropdown === 'owner'
                           ? 'Select Owner'
-                          : 'Select Payment Provider'}
+                          : activePropDropdown === 'paymentAccountSetup'
+                          ? 'Payment Account Setup'
+                          : activePropDropdown === 'customGateway'
+                          ? 'Select Custom Gateway Provider'
+                          : activePropDropdown === 'gatewayStatus'
+                          ? 'Gateway Status'
+                          : 'Select Option'}
                       </Text>
                       <TouchableOpacity
                         onPress={() => setActivePropDropdown(null)}
@@ -2146,15 +2439,15 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                         </>
                       )}
 
-                      {activePropDropdown === 'paymentProvider' &&
-                        PAYMENT_PROVIDERS.map((pr) => {
-                          const isSelected = pPaymentProvider === pr;
+                      {activePropDropdown === 'paymentAccountSetup' &&
+                        PAYMENT_ACCOUNT_SETUPS.map((opt) => {
+                          const isSelected = pPaymentAccountSetup === opt.value;
                           return (
                             <TouchableOpacity
-                              key={pr}
+                              key={opt.value}
                               style={[styles.pickerRow, isSelected && styles.pickerRowSelected]}
                               onPress={() => {
-                                setPPaymentProvider(pr);
+                                setPPaymentAccountSetup(opt.value);
                                 setActivePropDropdown(null);
                               }}
                               activeOpacity={0.7}
@@ -2163,7 +2456,55 @@ export const PropertiesScreen = ({ initialTab = 'properties' }) => {
                                 style={[styles.detailVal, isSelected && { color: colors.primary, fontWeight: '700' }]}
                                 allowFontScaling={false}
                               >
-                                {pr}
+                                {opt.label}
+                              </Text>
+                              {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                            </TouchableOpacity>
+                          );
+                        })}
+
+                      {activePropDropdown === 'customGateway' &&
+                        CUSTOM_GATEWAY_PROVIDERS.map((opt) => {
+                          const isSelected = pCustomGateway === opt.value;
+                          return (
+                            <TouchableOpacity
+                              key={opt.value}
+                              style={[styles.pickerRow, isSelected && styles.pickerRowSelected]}
+                              onPress={() => {
+                                setPCustomGateway(opt.value);
+                                setActivePropDropdown(null);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text
+                                style={[styles.detailVal, isSelected && { color: colors.primary, fontWeight: '700' }]}
+                                allowFontScaling={false}
+                              >
+                                {opt.label}
+                              </Text>
+                              {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                            </TouchableOpacity>
+                          );
+                        })}
+
+                      {activePropDropdown === 'gatewayStatus' &&
+                        GATEWAY_STATUSES.map((opt) => {
+                          const isSelected = pPaymentStatus === opt.value;
+                          return (
+                            <TouchableOpacity
+                              key={opt.value}
+                              style={[styles.pickerRow, isSelected && styles.pickerRowSelected]}
+                              onPress={() => {
+                                setPPaymentStatus(opt.value);
+                                setActivePropDropdown(null);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text
+                                style={[styles.detailVal, isSelected && { color: colors.primary, fontWeight: '700' }]}
+                                allowFontScaling={false}
+                              >
+                                {opt.label}
                               </Text>
                               {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
                             </TouchableOpacity>
@@ -3888,8 +4229,8 @@ const getStyles = (colors, isDarkMode) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
-      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5',
-      borderColor: 'rgba(16, 185, 129, 0.4)',
+      backgroundColor: isDarkMode ? 'rgba(100, 116, 139, 0.15)' : '#f1f5f9',
+      borderColor: isDarkMode ? '#334155' : '#cbd5e1',
       borderWidth: 1,
       borderRadius: 6,
       paddingHorizontal: 7,
@@ -3899,7 +4240,7 @@ const getStyles = (colors, isDarkMode) =>
     companyDefaultBadgeText: {
       fontSize: 10,
       fontWeight: '700',
-      color: '#059669',
+      color: colors.textSecondary,
     },
     propPaymentSubtitle: {
       fontSize: 11,
@@ -3936,6 +4277,31 @@ const getStyles = (colors, isDarkMode) =>
       color: colors.textMuted,
       marginTop: 4,
       lineHeight: 14,
+    },
+    customGatewayBadge: {
+      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5',
+      borderColor: 'rgba(16, 185, 129, 0.4)',
+    },
+    passwordInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.inputBackground,
+      borderColor: colors.inputBorder,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingRight: 6,
+    },
+    passwordInput: {
+      flex: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      fontSize: 13,
+      color: colors.textPrimary,
+    },
+    eyeBtn: {
+      padding: 6,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     // Additional Details Accordion Box
     propAccordionBox: {
